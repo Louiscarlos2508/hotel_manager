@@ -1,0 +1,54 @@
+# === Python ===
+__pycache__/
+*.py[cod]
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+*.log
+
+# Virtual envs
+venv/
+env/
+ENV/
+.venv/
+.python-version
+
+# Jupyter Notebook
+.ipynb_checkpoints/
+
+# Pycharm / VSCode
+.idea/
+.vscode/
+*.code-workspace
+
+# OS / divers
+.DS_Store
+Thumbs.db
+*.bak
+*.swp
+
+# Qt Designer UI compiled files
+*.ui.py
+*.qrc.py
+*.qrc
+
+# Installer (PyInstaller, cx_Freeze, etc.)
+*.spec
+
+# Tests / coverage
+htmlcov/
+.tox/
+coverage.xml
+*.cover
+.cache/
+.pytest_cache/
+
+# mypy / pylint
+.mypy_cache/
+.dmypy.json
+.pyre/
+
+# Profiling
+profile.*
