@@ -5,35 +5,52 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="95a9215e-6b69-4b34-8d6d-adb4baeaabf3" name="Changes" comment="">
-      <change afterPath="$PROJECT_DIR$/models/paiement_model.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/ui/pages/paiement_page.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/HotelManger.iml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/HotelManger.iml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/addddd.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/controllers/commande_controller.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/controllers/commande_item_controller.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/controllers/facture_item_controller.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/controllers/probleme_controller.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/controllers/produit_controller.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/controllers/service_demande_controller.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/controllers/service_disponible_controller.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/models/commande_item_model.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/models/commande_model.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/models/facture_item_model.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/models/probleme_model.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/models/produit_model.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/models/service_demande_model.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/models/service_disponible_model.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/ui/pages/problemes.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/ui/pages/produit.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/ui/pages/restauration.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/ui/pages/services.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/utils/pdf_generator.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/add_user_manually.py" beforeDir="false" afterPath="$PROJECT_DIR$/add_user_manually.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/add_user_manually.py" beforeDir="false" />
       <change beforePath="$PROJECT_DIR$/controllers/auth_controller.py" beforeDir="false" afterPath="$PROJECT_DIR$/controllers/auth_controller.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/controllers/chambre_controller.py" beforeDir="false" afterPath="$PROJECT_DIR$/controllers/chambre_controller.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/controllers/client_controller.py" beforeDir="false" afterPath="$PROJECT_DIR$/controllers/client_controller.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/controllers/consommation_controller.py" beforeDir="false" afterPath="$PROJECT_DIR$/controllers/consommation_controller.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/controllers/consommation_controller.py" beforeDir="false" />
       <change beforePath="$PROJECT_DIR$/controllers/facture_controller.py" beforeDir="false" afterPath="$PROJECT_DIR$/controllers/facture_controller.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/controllers/hotel_info_controller.py" beforeDir="false" afterPath="$PROJECT_DIR$/controllers/hotel_info_controller.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/controllers/log_controller.py" beforeDir="false" afterPath="$PROJECT_DIR$/controllers/log_controller.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/controllers/paiement_controller.py" beforeDir="false" afterPath="$PROJECT_DIR$/controllers/paiement_controller.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/controllers/reservation_controller.py" beforeDir="false" afterPath="$PROJECT_DIR$/controllers/reservation_controller.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/controllers/statistiques_controller.py" beforeDir="false" afterPath="$PROJECT_DIR$/controllers/statistiques_controller.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/controllers/types_chambre_controller.py" beforeDir="false" afterPath="$PROJECT_DIR$/controllers/types_chambre_controller.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/controllers/user_controller.py" beforeDir="false" afterPath="$PROJECT_DIR$/controllers/user_controller.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/database/db.py" beforeDir="false" afterPath="$PROJECT_DIR$/database/db.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/database/schema_hotel.sql" beforeDir="false" afterPath="$PROJECT_DIR$/database/schema_hotel.sql" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/delete_table.py" beforeDir="false" afterPath="$PROJECT_DIR$/delete_table.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/delete_table.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/hotel.db" beforeDir="false" afterPath="$PROJECT_DIR$/hotel.db" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/main.py" beforeDir="false" afterPath="$PROJECT_DIR$/main.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/models/base_model.py" beforeDir="false" afterPath="$PROJECT_DIR$/models/base_model.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/models/chambre_model.py" beforeDir="false" afterPath="$PROJECT_DIR$/models/chambre_model.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/models/client_model.py" beforeDir="false" afterPath="$PROJECT_DIR$/models/client_model.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/models/consommation_model.py" beforeDir="false" afterPath="$PROJECT_DIR$/models/consommation_model.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/models/consommation_model.py" beforeDir="false" />
       <change beforePath="$PROJECT_DIR$/models/facture_model.py" beforeDir="false" afterPath="$PROJECT_DIR$/models/facture_model.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/models/hotel_info_model.py" beforeDir="false" afterPath="$PROJECT_DIR$/models/hotel_info_model.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/models/log_model.py" beforeDir="false" afterPath="$PROJECT_DIR$/models/log_model.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/models/paiement_model.py" beforeDir="false" afterPath="$PROJECT_DIR$/models/paiement_model.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/models/reservation_model.py" beforeDir="false" afterPath="$PROJECT_DIR$/models/reservation_model.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/models/type_chambre_model.py" beforeDir="false" afterPath="$PROJECT_DIR$/controllers/paiement_controller.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/models/types_chambre_model.py" beforeDir="false" afterPath="$PROJECT_DIR$/models/types_chambre_model.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/models/user_model.py" beforeDir="false" afterPath="$PROJECT_DIR$/models/user_model.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/ui/home.py" beforeDir="false" afterPath="$PROJECT_DIR$/ui/home.py" afterDir="false" />
@@ -43,12 +60,9 @@
       <change beforePath="$PROJECT_DIR$/ui/pages/clients.py" beforeDir="false" afterPath="$PROJECT_DIR$/ui/pages/clients.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/ui/pages/dashboard.py" beforeDir="false" afterPath="$PROJECT_DIR$/ui/pages/dashboard.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/ui/pages/departures.py" beforeDir="false" afterPath="$PROJECT_DIR$/ui/pages/departures.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/ui/pages/paiement_page.py" beforeDir="false" afterPath="$PROJECT_DIR$/ui/pages/paiement_page.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/ui/pages/reservations.py" beforeDir="false" afterPath="$PROJECT_DIR$/ui/pages/reservations.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/ui/pages/rooms.py" beforeDir="false" afterPath="$PROJECT_DIR$/ui/pages/rooms.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/ui/pages/settings.py" beforeDir="false" afterPath="$PROJECT_DIR$/ui/pages/settings.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/ui/pages/stats.py" beforeDir="false" afterPath="$PROJECT_DIR$/ui/pages/stats.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/ui/pages/users.py" beforeDir="false" afterPath="$PROJECT_DIR$/ui/pages/users.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/ui/splash.py" beforeDir="false" afterPath="$PROJECT_DIR$/ui/splash.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -83,8 +97,11 @@
   "keyToString": {
     "ModuleVcsDetector.initialDetectionPerformed": "true",
     "Python.add_user_manually.executor": "Run",
+    "Python.addddd.executor": "Run",
     "Python.arrivals.executor": "Run",
+    "Python.bar.executor": "Run",
     "Python.chambre_controller.executor": "Run",
+    "Python.chambre_model.executor": "Run",
     "Python.dashboard.executor": "Run",
     "Python.db.executor": "Run",
     "Python.delete_table.executor": "Run",
@@ -92,12 +109,17 @@
     "Python.home.executor": "Run",
     "Python.login.executor": "Run",
     "Python.main.executor": "Run",
+    "Python.paiement_page.executor": "Run",
+    "Python.reservation_controller.executor": "Run",
     "Python.reservations.executor": "Run",
+    "Python.services.executor": "Run",
     "Python.splash.executor": "Run",
     "RunOnceActivity.ShowReadmeOnStart": "true",
     "RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager": "true",
     "RunOnceActivity.git.unshallow": "true",
-    "git-widget-placeholder": "main"
+    "git-widget-placeholder": "main",
+    "last_opened_file_path": "/home/soutonnoma/PycharmProjects/HotelMangement",
+    "settings.editor.selected.configurable": "settings.sync"
   }
 }]]></component>
   <component name="SharedIndexes">

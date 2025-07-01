@@ -1,48 +1,85 @@
+# /home/soutonnoma/PycharmProjects/HotelManger/models/facture_model.py
 from models.base_model import BaseModel
+import sqlite3
 
 class FactureModel(BaseModel):
 
     @classmethod
-    def create(cls, reservation_id, montant_nuitee, montant_consommation, montant_total, methode_paiement):
-        conn = cls.connect()
-        cur = conn.cursor()
-        cur.execute("""
-            INSERT INTO factures (
-                reservation_id, montant_nuitee, montant_consommation,
-                montant_total, methode_paiement
-            ) VALUES (?, ?, ?, ?, ?)
-        """, (reservation_id, montant_nuitee, montant_consommation, montant_total, methode_paiement))
-        conn.commit()
-        conn.close()
+    def create(cls, reservation_id, statut="Brouillon"):
+        query = "INSERT INTO factures (reservation_id, statut) VALUES (?, ?)"
+        try:
+            with cls.connect() as conn:
+                cur = conn.cursor()
+                cur.execute(query, (reservation_id, statut))
+                conn.commit()
+                return cur.lastrowid
+        except sqlite3.IntegrityError as e:
+            raise Exception(f"Une facture existe déjà pour la réservation {reservation_id}.") from e
+        except sqlite3.Error as e:
+            raise Exception(f"Erreur création facture : {e}") from e
 
     @classmethod
     def get_by_reservation(cls, reservation_id):
-        conn = cls.connect()
-        cur = conn.cursor()
-        cur.execute("SELECT * FROM factures WHERE reservation_id = ?", (reservation_id,))
-        row = cur.fetchone()
-        conn.close()
-        return row
+        query = "SELECT * FROM factures WHERE reservation_id = ?"
+        try:
+            with cls.connect() as conn:
+                cur = conn.cursor()
+                cur.execute(query, (reservation_id,))
+                row = cur.fetchone()
+                return dict(row) if row else None
+        except sqlite3.Error as e:
+            raise Exception(f"Erreur récupération facture : {e}") from e
 
     @classmethod
-    def update_statut_paiement(cls, facture_id, nouveau_statut):
-        conn = cls.connect()
-        cur = conn.cursor()
-        cur.execute("""
-            UPDATE factures SET statut_paiement = ?
+    def update_statut(cls, facture_id, nouveau_statut):
+        query = "UPDATE factures SET statut = ? WHERE id = ?"
+        try:
+            with cls.connect() as conn:
+                cur = conn.cursor()
+                cur.execute(query, (nouveau_statut, facture_id))
+                conn.commit()
+                return cur.rowcount > 0
+        except sqlite3.Error as e:
+            raise Exception(f"Erreur mise à jour statut facture : {e}") from e
+
+    @classmethod
+    def update_montants(cls, facture_id, montant_total_ht, montant_total_tva, montant_total_ttc, montant_paye):
+        """Met à jour les montants détaillés (HT, TVA, TTC) et le montant payé d'une facture."""
+        query = """
+            UPDATE factures 
+            SET montant_total_ht = ?, montant_total_tva = ?, montant_total_ttc = ?, montant_paye = ? 
             WHERE id = ?
-        """, (nouveau_statut, facture_id))
-        conn.commit()
-        updated = cur.rowcount
-        conn.close()
-        return updated > 0
+        """
+        try:
+            with cls.connect() as conn:
+                cur = conn.cursor()
+                cur.execute(query, (montant_total_ht, montant_total_tva, montant_total_ttc, montant_paye, facture_id))
+                conn.commit()
+                return cur.rowcount > 0
+        except sqlite3.Error as e:
+            raise Exception(f"Erreur mise à jour montants facture : {e}") from e
 
     @classmethod
     def delete(cls, facture_id):
-        conn = cls.connect()
-        cur = conn.cursor()
-        cur.execute("DELETE FROM factures WHERE id = ?", (facture_id,))
-        conn.commit()
-        deleted = cur.rowcount
-        conn.close()
-        return deleted > 0
+        query = "DELETE FROM factures WHERE id = ?"
+        try:
+            with cls.connect() as conn:
+                cur = conn.cursor()
+                cur.execute(query, (facture_id,))
+                conn.commit()
+                return cur.rowcount > 0
+        except sqlite3.Error as e:
+            raise Exception(f"Erreur suppression facture : {e}") from e
+
+    @classmethod
+    def get_by_id(cls, facture_id):
+        """Récupère une facture par son ID."""
+        query = "SELECT * FROM factures WHERE id = ?"
+        try:
+            with cls.connect() as conn:
+                cur = conn.cursor()
+                cur.execute(query, (facture_id,))
+                row = cur.fetchone()
+                return dict(row) if row else None
+        except sqlite3.Error as e:
+            raise Exception(f"Erreur récupération facture par ID : {e}") from e

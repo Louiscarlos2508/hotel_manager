@@ -1,58 +1,47 @@
-import sqlite3
-from datetime import datetime
+# /home/soutonnoma/PycharmProjects/HotelManger/controllers/log_controller.py
+from models.log_model import LogModel
 
 class LogController:
-    def __init__(self, db_connection):
-        self.db = db_connection
+    """
+    Contrôleur pour la gestion des logs.
+    Il est conçu pour être instancié avec l'ID de l'utilisateur courant.
+    """
 
-    def log_action(self, user_id, action):
+    def __init__(self, user_id=None):
         """
-        Enregistre une action dans la table logs.
-        user_id peut être None (ex: action système).
+        Initialise le contrôleur avec l'ID de l'utilisateur effectuant les actions.
         """
-        if not action or action.strip() == "":
-            raise ValueError("L'action ne peut pas être vide.")
-        try:
-            cursor = self.db.cursor()
-            now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            cursor.execute(
-                "INSERT INTO logs (user_id, action, date_heure) VALUES (?, ?, ?)",
-                (user_id, action.strip(), now)
-            )
-            self.db.commit()
-            return cursor.lastrowid
-        except sqlite3.Error as e:
-            self.db.rollback()
-            raise Exception(f"Erreur lors de l'insertion du log: {e}")
+        self.user_id = user_id
 
-    def get_logs(self, limit=100, user_id=None):
+    def log_action(self, action: str, details: str = ""):
         """
-        Récupère les logs, optionnellement filtrés par user_id.
-        Limite le nombre de résultats (par défaut 100).
+        Enregistre une action de l'utilisateur.
+        Gère les cas où l'user_id n'est pas défini pour ne pas causer d'erreur.
         """
-        if limit <= 0:
-            raise ValueError("La limite doit être un entier positif.")
+        # Si le contrôleur a été initialisé sans user_id, on ne fait rien.
+        # C'est une sécurité pour les actions système ou les cas non prévus.
+        if self.user_id is None:
+            print(f"Warning: Log action '{action}' attempted without a valid user_id.")
+            return
+
         try:
-            cursor = self.db.cursor()
-            if user_id is not None:
-                cursor.execute(
-                    "SELECT id, user_id, action, date_heure FROM logs WHERE user_id = ? ORDER BY date_heure DESC LIMIT ?",
-                    (user_id, limit)
-                )
-            else:
-                cursor.execute(
-                    "SELECT id, user_id, action, date_heure FROM logs ORDER BY date_heure DESC LIMIT ?",
-                    (limit,)
-                )
-            rows = cursor.fetchall()
-            logs = []
-            for row in rows:
-                logs.append({
-                    "id": row[0],
-                    "user_id": row[1],
-                    "action": row[2],
-                    "date_heure": row[3],
-                })
-            return logs
-        except sqlite3.Error as e:
-            raise Exception(f"Erreur lors de la récupération des logs: {e}")
+            # Délègue la création au modèle.
+            LogModel.create(self.user_id, action, details)
+        except Exception as e:
+            # La journalisation ne doit jamais interrompre le flux principal de l'application.
+            # L'erreur est déjà affichée dans la console par le modèle.
+            pass
+
+    @staticmethod
+    def get_logs(limit=100):
+        """
+        Récupère les logs via le modèle.
+        Retourne une réponse standardisée pour l'interface utilisateur.
+        """
+        try:
+            logs = LogModel.get_all(limit)
+            return {"success": True, "data": logs}
+        except Exception as e:
+            # Ce cas est peu probable, car le modèle gère déjà les erreurs,
+            # mais c'est une bonne pratique.
+            return {"success": False, "error": f"Erreur lors de la récupération des logs : {e}"}

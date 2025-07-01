@@ -12,8 +12,12 @@ from ui.pages.bar import BarPage
 from ui.pages.clients import ClientsPage
 from ui.pages.dashboard import DashboardPage
 from ui.pages.departures import DeparturesPage
+from ui.pages.problemes import ProblemesPage
+from ui.pages.produit import ProduitsPage
 from ui.pages.reservations import ReservationsPage
+from ui.pages.restauration import RestaurationPage
 from ui.pages.rooms import RoomsPage
+from ui.pages.services import ServicesPage
 from ui.pages.settings import SettingsPage
 from ui.pages.stats import StatsPage
 from ui.pages.users import UsersPage
@@ -83,7 +87,11 @@ class HomeWindow(QMainWindow):
                 ("Tableau de bord", lambda: DashboardPage(self.username, self.role), "dashboard.png"),
                 ("Gestion \nutilisateurs", lambda: UsersPage(), "users.png"),
                 ("Gestion chambres", lambda: RoomsPage(), "rooms.png"),
-                ("Statistiques", lambda: StatsPage(), "stats.png"),
+                ("Clients", lambda: ClientsPage(), "clients.png"),
+                ("Services", lambda: ServicesPage(self.role), "services.png"),
+                ("Problèmes", lambda: ProblemesPage(), "warning.png"),
+                ("Gestion Produits", lambda: ProduitsPage(), "products.png"),
+                #("Statistiques", lambda: StatsPage(), "stats.png"),
                 ("Paramètres", lambda: SettingsPage(), "settings.png"),
             ]
         elif self.role == "reception":
@@ -93,11 +101,15 @@ class HomeWindow(QMainWindow):
                 ("Arrivées", lambda: ArrivalsPage(ReservationController(self.db)), "arrivals.png"),
                 ("Départs", lambda: DeparturesPage(ReservationController(self.db)), "departures.png"),
                 ("Clients", lambda: ClientsPage(), "clients.png"),
+                ("Services", lambda: ServicesPage(self.role), "services.png"),
+                ("Problèmes", lambda: ProblemesPage(), "warning.png"),
             ]
-        elif self.role == "bar":
+        elif self.role == "manager" or self.role == "bar":
             items = [
                 ("Tableau de bord", lambda: DashboardPage(self.username, self.role), "dashboard.png"),
                 ("Consommations \n clients", lambda: BarPage(), "bar.png"),
+                ("Restauration", lambda: RestaurationPage(), "food.png"),
+                ("Gestion Produits", lambda: ProduitsPage(), "products.png"),
             ]
         else:
             items = [("Tableau de bord", lambda: DashboardPage(self.username, self.role), "dashboard.png")]
@@ -255,7 +267,7 @@ class HomeWindow(QMainWindow):
 
         name, page_func = self.menu_buttons[btn]
 
-        if name in ["Tableau de bord", "Arrivées", "Départs", "Clients", "Réservations"]:
+        if name in ["Tableau de bord", "Arrivées", "Départs", "Clients", "Réservations", "Services", "Restauration", "Problèmes", "Consommations \n clients"]:
             # Supprimer l'ancienne page si elle existe
             old_page = self.pages.get(name)
             if old_page:
@@ -315,6 +327,14 @@ class HomeWindow(QMainWindow):
     def page_rooms(self):
         return RoomsPage()
 
+    def page_services(self):
+        return ServicesPage()
+
+    def page_problemes(self):
+        return ProblemesPage()
+
+    def page_restauration(self):
+        return RestaurationPage()
 
     # --- Drag fenêtre frameless ---
     def mousePressEvent(self, event):

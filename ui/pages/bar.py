@@ -1,197 +1,205 @@
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QLabel, QHBoxLayout, QTableWidget, QTableWidgetItem,
-    QPushButton, QLineEdit, QMessageBox, QSpinBox, QDoubleSpinBox, QComboBox
+    QPushButton, QMessageBox, QSpinBox, QComboBox, QHeaderView
 )
 from PySide6.QtGui import QFont
-from controllers.consommation_controller import ConsommationController
-from controllers.reservation_controller import ReservationController  # pour récupérer les réservations
-from database.db import get_connection
+from controllers.commande_controller import CommandeController
+from controllers.commande_item_controller import CommandeItemController
+from controllers.produit_controller import ProduitController
+from controllers.reservation_controller import ReservationController
+from models.produit_model import ProduitModel
 
 
 class BarPage(QWidget):
-    def __init__(self):
+    def __init__(self, user_id=None):
         super().__init__()
-        layout = QVBoxLayout(self)
-        self.setLayout(layout)
-        self.consommation_actuelle_id = None  # ID en cours de modification
+        self.user_id = user_id
+        self.commande_id = None  # Commande Bar liée à la réservation sélectionnée
+        self.current_item_id = None  # Pour une future édition
 
-        title = QLabel("Bar - Gestion des consommations")
+        self.setLayout(QVBoxLayout())
+        title = QLabel("Bar – Commandes")
         title.setFont(QFont("Segoe UI", 24, QFont.Bold))
-        layout.addWidget(title)
+        self.layout().addWidget(title)
 
-        # Formulaire ajout consommation
+        self.init_form()
+        self.init_table()
+
+        # On charge les données après avoir initialisé l'UI
+        self.load_produits()
+        self.load_reservations()  # Ceci va déclencher le reste de la logique
+
+    def init_form(self):
         form_layout = QHBoxLayout()
 
-        # Choix réservation (id + info simple)
-        form_layout.addWidget(QLabel("Réservation:"))
-        self.combo_reservations = QComboBox()
-        self.load_reservations()
-        form_layout.addWidget(self.combo_reservations)
+        self.combo_resa = QComboBox()
+        self.combo_resa.currentIndexChanged.connect(self.reservation_changed)
+        form_layout.addWidget(QLabel("Client (Chambre - Nom):"))
+        form_layout.addWidget(self.combo_resa, 2)  # Donne plus d'espace
 
-        # Désignation
-        form_layout.addWidget(QLabel("Désignation:"))
-        self.input_designation = QLineEdit()
-        form_layout.addWidget(self.input_designation)
+        self.combo_produit = QComboBox()
+        form_layout.addWidget(QLabel("Produit:"))
+        form_layout.addWidget(self.combo_produit, 2)  # Donne plus d'espace
 
-        # Quantité
+        self.input_qte = QSpinBox()
+        self.input_qte.setMinimum(1)
+        self.input_qte.setMaximum(99)
         form_layout.addWidget(QLabel("Quantité:"))
-        self.input_quantite = QSpinBox()
-        self.input_quantite.setMinimum(1)
-        self.input_quantite.setValue(1)
-        form_layout.addWidget(self.input_quantite)
+        form_layout.addWidget(self.input_qte, 1)
 
-        # Prix unitaire
-        form_layout.addWidget(QLabel("Prix unitaire:"))
-        self.input_prix_unitaire = QDoubleSpinBox()
-        self.input_prix_unitaire.setMinimum(0)
-        self.input_prix_unitaire.setMaximum(1000000)
-        self.input_prix_unitaire.setDecimals(2)
-        form_layout.addWidget(self.input_prix_unitaire)
+        self.btn_ajouter = QPushButton("➕ Ajouter")
+        self.btn_ajouter.clicked.connect(self.ajouter_ou_modifier_item)
+        form_layout.addWidget(self.btn_ajouter)
 
-        # Bouton ajouter
-        self.btn_add = QPushButton("Ajouter")
-        self.btn_add.clicked.connect(self.add_consommation)
-        form_layout.addWidget(self.btn_add)
+        self.layout().addLayout(form_layout)
 
-        layout.addLayout(form_layout)
-
-        # Tableau consommations
+    def init_table(self):
         self.table = QTableWidget()
         self.table.setColumnCount(6)
-        self.table.setHorizontalHeaderLabels(["ID", "Réservation ID", "Désignation", "Quantité", "Prix unitaire", "Actions"])
-        self.table.horizontalHeader().setStretchLastSection(True)
-        layout.addWidget(self.table)
-
-        self.load_consommations()
+        self.table.setHorizontalHeaderLabels(["ID", "Produit", "Quantité", "P.U.", "Total", "Actions"])
+        self.table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        self.table.setColumnWidth(0, 50)  # ID
+        self.table.setColumnWidth(2, 80)  # Quantité
+        self.table.setColumnWidth(5, 100)  # Actions
+        self.layout().addWidget(self.table)
 
     def load_reservations(self):
-        self.combo_reservations.clear()
+        """Charge uniquement les réservations avec le statut 'check-in'."""
+        # --- RÈGLE MÉTIER APPLIQUÉE ICI ---
+        filtre = {"statuts": ["check-in"]}
+        result = ReservationController.list_reservations(filtre=filtre)
+
+        self.combo_resa.clear()
+        self.combo_resa.addItem("--- Sélectionner un client ---", None)
+
+        if result.get("success"):
+            reservations = result["data"]
+            if not reservations:
+                self.set_form_enabled(False)  # Désactive le formulaire si personne n'est là
+            else:
+                self.set_form_enabled(True)
+
+            for resa in reservations:
+                # Label plus informatif pour l'utilisateur
+                label = f"Chambre {resa.get('chambre', '?')} - {resa.get('client', 'N/A')}"
+                self.combo_resa.addItem(label, resa["id"])
+        else:
+            QMessageBox.warning(self, "Erreur", result.get("error", "Erreur chargement réservations."))
+
+    def load_produits(self):
+        """
+        Charge uniquement les produits de type 'boisson' qui sont disponibles.
+        """
+        self.combo_produit.clear()
+
+        # --- MODIFICATION : Définir les catégories de boissons autorisées ---
+        drink_categories = ['Boisson chaude', 'Boisson fraîche', 'Alcool']
+
         try:
-            conn = get_connection()
-            controller = ReservationController(conn)
-
-            # On filtre uniquement les réservations en cours
-            result = controller.list_reservations(filtre={"statut": "en cours"})
-            if not result.get("success", False):
-                QMessageBox.warning(self, "Erreur",
-                                    f"Erreur chargement réservations : {result.get('error', 'Erreur inconnue')}")
-                return
-
-            reservations = result.get("data", [])
-
-            for res in reservations:
-                # Affiche ID + numéro de chambre
-                text = f"ID {res['id']} - Chambre {res['chambre_numero']}"
-                self.combo_reservations.addItem(text, res['id'])
-
-            conn.close()
+            result = ProduitController.liste_produits()
+            if result.get("success"):
+                # On parcourt tous les produits récupérés
+                for p in result["data"]:
+                    # --- MODIFICATION : On ajoute la condition sur la catégorie ici ---
+                    if p["disponible"] and p.get("categorie") in drink_categories:
+                        self.combo_produit.addItem(f"{p['nom']} - {p['prix_unitaire']} FCFA", p)
+            else:
+                raise Exception(result.get("error"))
         except Exception as e:
-            QMessageBox.warning(self, "Erreur", f"Erreur chargement réservations : {e}")
+            QMessageBox.warning(self, "Erreur", f"Erreur chargement produits : {e}")
 
-    def load_consommations(self):
+    def reservation_changed(self):
+        """Appelé quand l'utilisateur change de réservation dans la liste."""
+        resa_id = self.combo_resa.currentData()
+        if not resa_id:
+            self.commande_id = None
+            self.table.setRowCount(0)  # Vide la table si aucune réservation n'est sélectionnée
+            return
+
+        # --- LOGIQUE "TROUVER OU CRÉER" APPLIQUÉE ICI ---
+        result = CommandeController.get_or_create_commande(resa_id, self.user_id, "Bar")
+
+        if result.get("success"):
+            self.commande_id = result["id"]
+            self.load_items()
+        else:
+            QMessageBox.warning(self, "Erreur", result.get("error", "Erreur gestion de la commande."))
+            self.commande_id = None
+            self.table.setRowCount(0)
+
+    def ajouter_ou_modifier_item(self):
+        produit = self.combo_produit.currentData()
+        if not produit:
+            QMessageBox.warning(self, "Erreur", "Veuillez sélectionner un produit.")
+            return
+
+        quantite = self.input_qte.value()
+        if quantite <= 0:
+            QMessageBox.warning(self, "Erreur", "La quantité doit être supérieure à zéro.")
+            return
+
+        if not self.commande_id:
+            QMessageBox.warning(self, "Erreur", "Veuillez d'abord sélectionner un client.")
+            return
+
+        if self.current_item_id:
+            QMessageBox.information(self, "Info", "L'édition d'article n'est pas encore implémentée.")
+        else:
+            res = CommandeItemController.ajouter_item(
+                self.commande_id, produit["id"], quantite, produit["prix_unitaire"]
+            )
+            if res.get("success"):
+                self.reset_form()
+                self.load_items()
+            else:
+                QMessageBox.warning(self, "Erreur", res.get("error", "Erreur lors de l'ajout de l'article."))
+
+    def load_items(self):
+        """Charge les articles de la commande actuellement sélectionnée."""
         self.table.setRowCount(0)
-        try:
-            response = ConsommationController.get_all_consommations()
-            if response.get("success"):
-                consommations = response.get("data", [])
-            else:
-                consommations = []
-                QMessageBox.warning(self, "Erreur", response.get("error", "Erreur inconnue"))
-        except Exception as e:
-            consommations = []
-            QMessageBox.warning(self, "Erreur", f"Erreur chargement consommations : {e}")
+        if not self.commande_id:
+            return
 
-        for row, conso in enumerate(consommations):
+        res = CommandeItemController.liste_items(self.commande_id)
+        if not res.get("success"):
+            QMessageBox.warning(self, "Erreur", res.get("error", "Erreur chargement articles."))
+            return
+
+        items = res.get("data", [])
+        for row, item in enumerate(items):
             self.table.insertRow(row)
-            self.table.setItem(row, 0, QTableWidgetItem(str(conso["id"])))
-            self.table.setItem(row, 1, QTableWidgetItem(str(conso["reservation_id"])))
-            self.table.setItem(row, 2, QTableWidgetItem(conso["designation"]))
-            self.table.setItem(row, 3, QTableWidgetItem(str(conso["quantite"])))
-            self.table.setItem(row, 4, QTableWidgetItem(f"{conso['prix_unitaire']:.2f}"))
+            self.table.setItem(row, 0, QTableWidgetItem(str(item["id"])))
+            self.table.setItem(row, 1, QTableWidgetItem(item["produit_nom"]))
+            self.table.setItem(row, 2, QTableWidgetItem(str(item["quantite"])))
+            self.table.setItem(row, 3, QTableWidgetItem(f"{item['prix_unitaire_capture']:,.0f}"))
+            total = item["quantite"] * item["prix_unitaire_capture"]
+            self.table.setItem(row, 4, QTableWidgetItem(f"{total:,.0f}"))
 
-            action_layout = QHBoxLayout()
-            widget_action = QWidget()
+            btn_supp = QPushButton("🗑️ Supprimer")
+            btn_supp.clicked.connect(lambda _, iid=item["id"]: self.supprimer_item(iid))
+            self.table.setCellWidget(row, 5, btn_supp)
 
-            btn_edit = QPushButton("Modifier")
-            btn_edit.clicked.connect(lambda _, c=conso: self.charger_formulaire_conso(c))
-            action_layout.addWidget(btn_edit)
-
-            btn_delete = QPushButton("Supprimer")
-            btn_delete.clicked.connect(lambda _, cid=conso["id"]: self.delete_consommation(cid))
-            action_layout.addWidget(btn_delete)
-
-            action_layout.setContentsMargins(0, 0, 0, 0)
-            widget_action.setLayout(action_layout)
-            self.table.setCellWidget(row, 5, widget_action)
-
-    def charger_formulaire_conso(self, conso):
-        self.consommation_actuelle_id = conso["id"]
-        self.input_designation.setText(conso["designation"])
-        self.input_quantite.setValue(conso["quantite"])
-        self.input_prix_unitaire.setValue(conso["prix_unitaire"])
-
-        index = self.combo_reservations.findData(conso["reservation_id"])
-        if index >= 0:
-            self.combo_reservations.setCurrentIndex(index)
-
-        self.btn_add.setText("Modifier")
-
-    def add_consommation(self):
-        reservation_id = self.combo_reservations.currentData()
-        designation = self.input_designation.text().strip()
-        quantite = self.input_quantite.value()
-        prix_unitaire = self.input_prix_unitaire.value()
-
-        if reservation_id is None:
-            QMessageBox.warning(self, "Erreur", "Veuillez sélectionner une réservation valide.")
-            return
-
-        if not designation:
-            QMessageBox.warning(self, "Erreur", "La désignation est obligatoire.")
-            return
-
-        self.btn_add.setEnabled(False)
-
-        try:
-            if self.consommation_actuelle_id is not None:
-                # Mode modification
-                result = ConsommationController.update_consommation(
-                    self.consommation_actuelle_id, reservation_id, designation, quantite, prix_unitaire
-                )
-                if result.get("success"):
-                    QMessageBox.information(self, "Succès", "Consommation modifiée.")
-                else:
-                    QMessageBox.warning(self, "Erreur", result.get("error", "Erreur modification"))
+    def supprimer_item(self, item_id):
+        rep = QMessageBox.question(self, "Confirmation", "Voulez-vous vraiment supprimer cet article ?",
+                                   QMessageBox.Yes | QMessageBox.No)
+        if rep == QMessageBox.Yes:
+            res = CommandeItemController.supprimer_item(item_id)
+            if res.get("success"):
+                self.load_items()
             else:
-                # Mode ajout
-                result = ConsommationController.add_consommation(
-                    reservation_id, designation, quantite, prix_unitaire
-                )
-                if result.get("success"):
-                    QMessageBox.information(self, "Succès", "Consommation ajoutée.")
-                else:
-                    QMessageBox.warning(self, "Erreur", result.get("error", "Erreur ajout"))
+                QMessageBox.warning(self, "Erreur", res.get("error", "Erreur lors de la suppression."))
 
-            # Réinitialise le formulaire
-            self.input_designation.clear()
-            self.input_quantite.setValue(1)
-            self.input_prix_unitaire.setValue(0.0)
-            self.combo_reservations.setCurrentIndex(0)
-            self.consommation_actuelle_id = None
-            self.btn_add.setText("Ajouter")
-            self.load_consommations()
+    def reset_form(self):
+        self.input_qte.setValue(1)
+        self.combo_produit.setCurrentIndex(0)
+        self.current_item_id = None
+        self.btn_ajouter.setText("➕ Ajouter")
 
-        except Exception as e:
-            QMessageBox.warning(self, "Erreur", f"Erreur consommation : {e}")
-        finally:
-            self.btn_add.setEnabled(True)
-
-    def delete_consommation(self, consommation_id):
-        confirm = QMessageBox.question(self, "Confirmer", "Supprimer cette consommation ?", QMessageBox.Yes | QMessageBox.No)
-        if confirm == QMessageBox.Yes:
-            try:
-                ConsommationController.delete_consommation(consommation_id)
-                QMessageBox.information(self, "Succès", "Consommation supprimée.")
-                self.load_consommations()
-            except Exception as e:
-                QMessageBox.warning(self, "Erreur", f"Erreur suppression consommation : {e}")
+    def set_form_enabled(self, enabled: bool):
+        """Active ou désactive les widgets du formulaire."""
+        self.combo_produit.setEnabled(enabled)
+        self.input_qte.setEnabled(enabled)
+        self.btn_ajouter.setEnabled(enabled)
+        if not enabled:
+            self.combo_resa.setCurrentIndex(0)
+            self.combo_resa.setToolTip("Aucun client n'est actuellement en statut 'check-in'.")

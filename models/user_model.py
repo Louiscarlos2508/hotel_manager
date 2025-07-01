@@ -1,110 +1,128 @@
+import sqlite3
+from typing import List, Dict, Any, Optional
+
+from werkzeug.security import generate_password_hash, check_password_hash
+
 from models.base_model import BaseModel
-import hashlib
+
 
 class UserModel(BaseModel):
+    """
+    Modèle pour gérer les utilisateurs (users) dans la base de données.
+    Utilise un hashage de mot de passe robuste avec Werkzeug.
+    """
 
     @classmethod
-    def get_by_username(cls, username):
-        conn = cls.connect()
-        cur = conn.cursor()
-        cur.execute("SELECT * FROM users WHERE username = ?", (username,))
-        row = cur.fetchone()
-        conn.close()
-        return row
-
-    @classmethod
-    def get_all(cls):
-        conn = cls.connect()
-        cur = conn.cursor()
-        cur.execute("SELECT id, username, nom_complet, role, actif FROM users")
-        rows = cur.fetchall()
-        conn.close()
-
-        return [
-            {
-                "id": row[0],
-                "username": row[1],
-                "nom_complet": row[2],
-                "role": row[3],
-                "actif": bool(row[4])
-            }
-            for row in rows
-        ]
-
-    @classmethod
-    def create(cls, username, password, role, nom_complet=None, actif=True):
-        """Crée un nouvel utilisateur avec hashage du mot de passe"""
-        password_hash = hashlib.sha256(password.encode('utf-8')).hexdigest()
-        conn = cls.connect()
-        cur = conn.cursor()
+    def get_by_username(cls, username: str) -> Optional[Dict[str, Any]]:
+        """Récupère un utilisateur par son nom d'utilisateur."""
+        query = "SELECT * FROM users WHERE username = ?"
         try:
-            cur.execute("""
-                INSERT INTO users (username, password_hash, role, nom_complet, actif)
-                VALUES (?, ?, ?, ?, ?)
-            """, (username, password_hash, role, nom_complet, int(actif)))
-            conn.commit()
-        except Exception as e:
-            print(f"Erreur création utilisateur: {e}")
-            conn.rollback()
-            raise
-        finally:
-            conn.close()
+            with cls.connect() as conn:
+                cur = conn.cursor()
+                cur.execute(query, (username,))
+                row = cur.fetchone()
+                return dict(row) if row else None
+        except sqlite3.Error as e:
+            raise Exception(f"Erreur de récupération de l'utilisateur {username}: {e}") from e
 
     @classmethod
-    def update_password(cls, user_id, new_password):
-        """Met à jour le mot de passe d'un utilisateur"""
-        password_hash = hashlib.sha256(new_password.encode('utf-8')).hexdigest()
-        conn = cls.connect()
-        cur = conn.cursor()
+    def get_all(cls) -> List[Dict[str, Any]]:
+        """Récupère tous les utilisateurs avec des informations non sensibles."""
+        query = "SELECT id, username, nom_complet, role, actif FROM users ORDER BY nom_complet"
         try:
-            cur.execute("UPDATE users SET password_hash = ? WHERE id = ?", (password_hash, user_id))
-            conn.commit()
-        except Exception as e:
-            print(f"Erreur mise à jour mot de passe: {e}")
-            conn.rollback()
-            raise
-        finally:
-            conn.close()
+            with cls.connect() as conn:
+                cur = conn.cursor()
+                cur.execute(query)
+                # La conversion en dict(row) est plus propre et robuste
+                return [dict(row) for row in cur.fetchall()]
+        except sqlite3.Error as e:
+            raise Exception(f"Erreur de récupération de tous les utilisateurs : {e}") from e
 
     @classmethod
-    def set_active_status(cls, user_id, actif):
-        """Active ou désactive un utilisateur"""
-        conn = cls.connect()
-        cur = conn.cursor()
+    def create(cls, username: str, password: str, role: str, nom_complet: Optional[str] = None, actif: bool = True) -> int:
+        """
+        Crée un nouvel utilisateur avec un mot de passe hashé par Werkzeug.
+        """
+        # Utilisation de generate_password_hash pour un hashage sécurisé (avec sel)
+        password_hash = generate_password_hash(password)
+        query = """
+            INSERT INTO users (username, password_hash, role, nom_complet, actif)
+            VALUES (?, ?, ?, ?, ?)
+        """
         try:
-            cur.execute("UPDATE users SET actif = ? WHERE id = ?", (int(actif), user_id))
-            conn.commit()
-        except Exception as e:
-            print(f"Erreur changement statut actif: {e}")
-            conn.rollback()
-            raise
-        finally:
-            conn.close()
+            with cls.connect() as conn:
+                cur = conn.cursor()
+                cur.execute(query, (username, password_hash, role, nom_complet, int(actif)))
+                conn.commit()
+                return cur.lastrowid
+        except sqlite3.IntegrityError as e:
+            # Cette erreur se produit si le username est déjà pris (contrainte UNIQUE)
+            raise Exception(f"Le nom d'utilisateur '{username}' est déjà utilisé.") from e
+        except sqlite3.Error as e:
+            raise Exception(f"Erreur base de données lors de la création de l'utilisateur : {e}") from e
 
     @classmethod
-    def update_user(cls, user_id, nom_complet, role, actif):
-        conn = cls.connect()
-        cur = conn.cursor()
+    def update_password(cls, user_id: int, new_password: str) -> bool:
+        """Met à jour le mot de passe d'un utilisateur."""
+        password_hash = generate_password_hash(new_password)
+        query = "UPDATE users SET password_hash = ? WHERE id = ?"
         try:
-            cur.execute("""
-                UPDATE users SET nom_complet = ?, role = ?, actif = ? WHERE id = ?
-            """, (nom_complet, role, int(actif), user_id))
-            conn.commit()
-        except Exception as e:
-            conn.rollback()
-            raise
-        finally:
-            conn.close()
+            with cls.connect() as conn:
+                cur = conn.cursor()
+                cur.execute(query, (password_hash, user_id))
+                conn.commit()
+                return cur.rowcount > 0
+        except sqlite3.Error as e:
+            raise Exception(f"Erreur de mise à jour du mot de passe pour l'utilisateur {user_id}: {e}") from e
 
     @classmethod
-    def delete_user(cls, user_id):
-        conn = cls.connect()
-        cur = conn.cursor()
+    def check_password(cls, username: str, password: str) -> bool:
+        """
+        Vérifie si le mot de passe fourni correspond à celui de l'utilisateur.
+        C'est la méthode à utiliser pour la connexion (login).
+        """
+        user = cls.get_by_username(username)
+        if user and 'password_hash' in user:
+            return check_password_hash(user['password_hash'], password)
+        return False
+
+    @classmethod
+    def set_active_status(cls, user_id: int, actif: bool) -> bool:
+        """Active ou désactive un utilisateur."""
+        query = "UPDATE users SET actif = ? WHERE id = ?"
         try:
-            cur.execute("DELETE FROM users WHERE id = ?", (user_id,))
-            conn.commit()
-        except Exception as e:
-            conn.rollback()
-            raise
-        finally:
-            conn.close()
+            with cls.connect() as conn:
+                cur = conn.cursor()
+                cur.execute(query, (int(actif), user_id))
+                conn.commit()
+                return cur.rowcount > 0
+        except sqlite3.Error as e:
+            raise Exception(f"Erreur de changement de statut pour l'utilisateur {user_id}: {e}") from e
+
+    @classmethod
+    def update_user(cls, user_id: int, nom_complet: str, role: str, actif: bool) -> bool:
+        """Met à jour les informations d'un utilisateur (sans le mot de passe)."""
+        query = "UPDATE users SET nom_complet = ?, role = ?, actif = ? WHERE id = ?"
+        try:
+            with cls.connect() as conn:
+                cur = conn.cursor()
+                cur.execute(query, (nom_complet, role, int(actif), user_id))
+                conn.commit()
+                return cur.rowcount > 0
+        except sqlite3.Error as e:
+            raise Exception(f"Erreur de mise à jour de l'utilisateur {user_id}: {e}") from e
+
+    @classmethod
+    def delete_user(cls, user_id: int) -> bool:
+        """Supprime un utilisateur."""
+        # Attention: Il faudrait ajouter une logique pour empêcher la suppression de l'admin principal
+        # ou pour transférer ses responsabilités si nécessaire.
+        query = "DELETE FROM users WHERE id = ?"
+        try:
+            with cls.connect() as conn:
+                cur = conn.cursor()
+                cur.execute(query, (user_id,))
+                conn.commit()
+                return cur.rowcount > 0
+        except sqlite3.Error as e:
+            raise Exception(f"Erreur de suppression de l'utilisateur {user_id}: {e}") from e

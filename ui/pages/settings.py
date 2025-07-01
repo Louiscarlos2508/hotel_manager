@@ -21,7 +21,7 @@ class SettingsPage(QWidget):
         main_layout.addWidget(title)
 
         # Section Infos Hôtel
-        self.group_hotel = QGroupBox("Informations générales de l'hôtel")
+        self.group_hotel = QGroupBox("Informations et Fiscalité")
         hotel_layout = QFormLayout(self.group_hotel)
         self.input_nom = QLineEdit()
         self.input_adresse = QLineEdit()
@@ -35,7 +35,27 @@ class SettingsPage(QWidget):
         hotel_layout.addRow("Email :", self.input_email)
         hotel_layout.addRow("SIRET :", self.input_siret)
 
-        self.btn_save_hotel = QPushButton("Enregistrer")
+        # Champs pour la TVA (inchangés)
+        self.input_tva_hebergement = QDoubleSpinBox()
+        self.input_tva_hebergement.setSuffix(" %")
+        self.input_tva_hebergement.setRange(0, 100)
+        self.input_tva_hebergement.setDecimals(2)
+        self.input_tva_restauration = QDoubleSpinBox()
+        self.input_tva_restauration.setSuffix(" %")
+        self.input_tva_restauration.setRange(0, 100)
+        self.input_tva_restauration.setDecimals(2)
+        hotel_layout.addRow("TVA Hébergement :", self.input_tva_hebergement)
+        hotel_layout.addRow("TVA Bar & Restaurant :", self.input_tva_restauration)
+
+        # --- NOUVEAU : Champ pour la TDT ---
+        self.input_tdt = QDoubleSpinBox()
+        self.input_tdt.setSuffix(" FCFA")
+        self.input_tdt.setRange(0, 10000)  # Montant max par personne
+        self.input_tdt.setDecimals(0)
+        hotel_layout.addRow("Taxe de séjour (TDT) / pers / nuit :", self.input_tdt)
+        # --- FIN DE LA NOUVEAUTÉ ---
+
+        self.btn_save_hotel = QPushButton("Enregistrer les informations")
         self.btn_save_hotel.clicked.connect(self.save_hotel_info)
         hotel_layout.addRow(self.btn_save_hotel)
         main_layout.addWidget(self.group_hotel)
@@ -98,16 +118,23 @@ class SettingsPage(QWidget):
 
     def load_hotel_info(self):
         res = HotelInfoController.get_info()
-        if res["success"] and res["data"]:
+        if res.get("success") and res.get("data"):
             info = res["data"]
             self.input_nom.setText(info.get("nom", ""))
             self.input_adresse.setText(info.get("adresse", ""))
             self.input_telephone.setText(info.get("telephone", ""))
             self.input_email.setText(info.get("email", ""))
             self.input_siret.setText(info.get("siret", ""))
+
+            self.input_tva_hebergement.setValue(info.get("tva_hebergement", 0.10) * 100)
+            self.input_tva_restauration.setValue(info.get("tva_restauration", 0.18) * 100)
+
+            # --- MODIFICATION : Charger la TDT ---
+            self.input_tdt.setValue(info.get("tdt_par_personne", 0))
         else:
-            # Aucun info chargée
-            pass
+            self.input_tva_hebergement.setValue(10.0)
+            self.input_tva_restauration.setValue(18.0)
+            self.input_tdt.setValue(0)
 
     def save_hotel_info(self):
         nom = self.input_nom.text().strip()
@@ -120,15 +147,25 @@ class SettingsPage(QWidget):
             QMessageBox.warning(self, "Erreur", "Le nom de l'hôtel est obligatoire.")
             return
 
-        res = HotelInfoController.save_info(nom, adresse, telephone, email, siret)
-        if res["success"]:
+        tva_hebergement = self.input_tva_hebergement.value() / 100.0
+        tva_restauration = self.input_tva_restauration.value() / 100.0
+
+        # --- MODIFICATION : Récupérer la TDT ---
+        tdt_par_personne = self.input_tdt.value()
+
+        res = HotelInfoController.save_info(
+            nom, adresse, telephone, email, siret,
+            tva_hebergement, tva_restauration, tdt_par_personne
+        )
+
+        if res.get("success"):
             QMessageBox.information(self, "Succès", "Informations de l'hôtel enregistrées.")
         else:
-            QMessageBox.warning(self, "Erreur", res["error"])
+            QMessageBox.warning(self, "Erreur", res.get("error"))
 
     def load_types(self):
         self.table_types.setRowCount(0)
-        res = TypesChambreController.get_all_types_chambre()
+        res = TypesChambreController.lister_types()
         if not res["success"]:
             QMessageBox.warning(self, "Erreur", res["error"])
             return
@@ -189,7 +226,7 @@ class SettingsPage(QWidget):
         nom = self.input_type_nom.text().strip()
         desc = self.input_type_desc.toPlainText().strip()
         prix = self.input_type_prix.value()
-        res = TypesChambreController.create_type_chambre(nom, desc, prix)
+        res = TypesChambreController.ajouter_type(nom, desc, prix)
         if res["success"]:
             QMessageBox.information(self, "Succès", res["message"])
             self.load_types()
@@ -206,7 +243,7 @@ class SettingsPage(QWidget):
         nom = self.input_type_nom.text().strip()
         desc = self.input_type_desc.toPlainText().strip()
         prix = self.input_type_prix.value()
-        res = TypesChambreController.update_type_chambre(self.selected_type_id, nom, desc, prix)
+        res = TypesChambreController.modifier_type(self.selected_type_id, nom, desc, prix)
         if res["success"]:
             QMessageBox.information(self, "Succès", res["message"])
             self.load_types()
@@ -224,7 +261,7 @@ class SettingsPage(QWidget):
             QMessageBox.Yes | QMessageBox.No
         )
         if confirm == QMessageBox.Yes:
-            res = TypesChambreController.delete_type_chambre(self.selected_type_id)
+            res = TypesChambreController.supprimer_type(self.selected_type_id)
             if res["success"]:
                 QMessageBox.information(self, "Succès", res["message"])
                 self.load_types()

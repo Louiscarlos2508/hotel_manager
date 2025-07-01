@@ -1,56 +1,58 @@
-from datetime import datetime
+# /home/soutonnoma/PycharmProjects/HotelManger/controllers/paiement_controller.py
 from models.paiement_model import PaiementModel
+from models.facture_model import FactureModel
+
 
 class PaiementController:
 
     @staticmethod
-    def enregistrer_paiement(facture_id, montant, methode, date_paiement=None):
-        if not facture_id:
-            raise ValueError("L'ID de facture est obligatoire.")
-        if montant <= 0:
-            raise ValueError("Le montant doit être strictement positif.")
-        if not methode or methode.strip() == "":
-            raise ValueError("La méthode de paiement est obligatoire.")
-
-        if date_paiement is not None:
-            if isinstance(date_paiement, str):
-                # On peut tenter un parse ISO
-                try:
-                    datetime.fromisoformat(date_paiement)
-                except ValueError:
-                    raise ValueError("La date de paiement doit être au format ISO 'YYYY-MM-DD' ou un datetime valide.")
-            elif not isinstance(date_paiement, datetime):
-                raise ValueError("La date de paiement doit être une chaîne ISO ou un objet datetime.")
-
+    def creer_paiement(facture_id, montant, methode, date_paiement=None):
+        """
+        Crée un paiement et met à jour le montant payé sur la facture associée.
+        """
+        if not facture_id or not isinstance(facture_id, int) or facture_id <= 0:
+            return {"success": False, "error": "ID facture invalide."}
+        if montant is None or montant <= 0:
+            return {"success": False, "error": "Montant invalide."}
+        if not methode or not isinstance(methode, str):
+            return {"success": False, "error": "Méthode de paiement invalide."}
         try:
-            paiement_id = PaiementModel.create(facture_id, montant, methode.strip(), date_paiement)
-            return paiement_id
+            # 1. Récupérer la facture pour connaître le montant déjà payé
+            facture = FactureModel.get_by_id(facture_id)
+            if not facture:
+                return {"success": False, "error": "Facture associée introuvable."}
+
+            # 2. Créer le nouvel enregistrement de paiement
+            paiement_id = PaiementModel.create(facture_id, montant, methode, date_paiement)
+
+            # 3. Mettre à jour le montant total payé sur la facture
+            nouveau_montant_paye = facture.get('montant_paye', 0) + montant
+            FactureModel.update_montants(
+                facture_id,
+                facture.get('montant_total_ht', 0),
+                facture.get('montant_total_tva', 0),
+                facture.get('montant_total_ttc', 0),
+                nouveau_montant_paye
+            )
+
+            return {"success": True, "paiement_id": paiement_id, "message": "Paiement créé avec succès."}
         except Exception as e:
-            raise Exception(f"Erreur lors de l'enregistrement du paiement : {e}")
+            return {"success": False, "error": f"Erreur création paiement : {e}"}
 
     @staticmethod
     def get_paiements_par_facture(facture_id):
-        if not facture_id:
-            raise ValueError("L'ID de facture est obligatoire.")
+        if not facture_id or not isinstance(facture_id, int) or facture_id <= 0:
+            return {"success": False, "error": "ID facture invalide."}
         try:
             paiements = PaiementModel.get_by_facture(facture_id)
-            return paiements
+            return {"success": True, "data": paiements}
         except Exception as e:
-            raise Exception(f"Erreur lors de la récupération des paiements : {e}")
+            return {"success": False, "error": f"Erreur récupération paiements : {e}"}
 
     @staticmethod
-    def supprimer_paiement(paiement_id):
-        if not paiement_id:
-            raise ValueError("L'ID de paiement est obligatoire.")
+    def get_all():
         try:
-            success = PaiementModel.delete(paiement_id)
-            if not success:
-                raise Exception("La suppression du paiement a échoué.")
-            return True
+            paiements = PaiementModel.get_all()
+            return {"success": True, "data": paiements}
         except Exception as e:
-            raise Exception(f"Erreur lors de la suppression du paiement : {e}")
-
-    @staticmethod
-    def mettre_a_jour_paiement(paiement_id, montant=None, methode=None, date_paiement=None):
-        # Implémenter si besoin, sinon lever NotImplementedError
-        raise NotImplementedError("Mise à jour des paiements non implémentée.")
+            return {"success": False, "error": f"Erreur récupération paiements : {e}"}

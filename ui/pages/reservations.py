@@ -1,11 +1,12 @@
+from collections import defaultdict
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QLabel, QHBoxLayout,
     QComboBox, QDateEdit, QPushButton, QMessageBox,
-    QLineEdit, QFormLayout, QGroupBox, QCheckBox, QTableWidget, QHeaderView, QAbstractItemView, QTableWidgetItem
+    QLineEdit, QFormLayout, QGroupBox, QCheckBox, QTableWidget, QHeaderView, QAbstractItemView, QTableWidgetItem,
+    QDialog, QSpinBox
 )
-from PySide6.QtCore import QDate
+from PySide6.QtCore import QDate, Qt
 from PySide6.QtGui import QFont
-from database.db import get_connection
 from controllers.reservation_controller import ReservationController
 from controllers.client_controller import ClientController
 from models.chambre_model import ChambreModel
@@ -15,69 +16,338 @@ class ReservationsPage(QWidget):
     def __init__(self, user_id=None):
         super().__init__()
 
-        self.conn = get_connection()
+        # Le contrôleur est notre unique point d'entrée pour les données de réservation
+        self.reservation_controller = ReservationController(user_id)
+        # Le modèle de chambre est seulement nécessaire pour le dialogue de création/modification
         self.chambre_model = ChambreModel()
-        self.reservation_controller = ReservationController(self.conn, user_id)
 
         self.layout = QVBoxLayout(self)
         self.setLayout(self.layout)
 
-        title = QLabel("Réservations")
+        # --- Configuration de l'interface (inchangée) ---
+        title = QLabel("Gestion des Réservations")
         title.setFont(QFont("Segoe UI", 24, QFont.Bold))
         self.layout.addWidget(title)
 
+        action_layout = QHBoxLayout()
+        btn_add = QPushButton("➕ Nouvelle réservation")
+        btn_add.clicked.connect(self.open_reservation_dialog)
+        action_layout.addWidget(btn_add)
+
+        btn_refresh = QPushButton("🔄 Actualiser")
+        btn_refresh.clicked.connect(self.refresh_table)
+        action_layout.addWidget(btn_refresh)
+
+        search_label = QLabel("🔍 Rechercher :")
+        self.input_search = QLineEdit()
+        self.input_search.setPlaceholderText("Nom client, n° chambre, statut...")
+        self.input_search.textChanged.connect(self.refresh_table)
+        action_layout.addWidget(search_label)
+        action_layout.addWidget(self.input_search)
+        self.layout.addLayout(action_layout)
+
+        self.table = QTableWidget()
+        self.table.setColumnCount(7)
+        self.table.setHorizontalHeaderLabels(["ID", "Client", "Chambre", "Arrivée", "Départ", "Statut", "Actions"])
+        self.table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        self.table.setEditTriggers(QAbstractItemView.NoEditTriggers)
+        self.table.setSelectionBehavior(QAbstractItemView.SelectRows)
+        self.layout.addWidget(self.table)
+
+        self.refresh_table()
+
+    def open_reservation_dialog(self):
+        # On passe les dépendances nécessaires au dialogue
+        dialog = ReservationFormDialog(self, self.chambre_model, self.reservation_controller)
+        if dialog.exec():
+            self.refresh_table()
+
+    def refresh_table(self):
+        """
+        Méthode ENTIÈREMENT RÉVISÉE pour être plus efficace et lisible.
+        """
+        try:
+            # 1. UN SEUL APPEL pour récupérer toutes les données nécessaires
+            response = self.reservation_controller.list_reservations()
+            if not response.get("success"):
+                QMessageBox.warning(self, "Erreur", response.get("error", "Erreur inconnue"))
+                return
+
+            all_reservations = response.get("data", [])
+
+            # 2. FILTRAGE (recherche) sur les données déjà en mémoire
+            search_text = self.input_search.text().lower().strip()
+            if search_text:
+                reservations_to_display = [
+                    r for r in all_reservations
+                    if search_text in r.get("client", "").lower()
+                       or search_text in r.get("chambre", "").lower()
+                       or search_text in r.get("statut", "").lower()
+                       or search_text in r.get("date_arrivee", "")
+                       or search_text in f"res-{r.get('id', '')}"
+                ]
+            else:
+                reservations_to_display = all_reservations
+
+            # 3. TRI et GROUPEMENT des données filtrées
+            reservations_to_display.sort(key=lambda r: r["date_arrivee"], reverse=True)
+            grouped = defaultdict(list)
+            for r in reservations_to_display:
+                grouped[r["date_arrivee"]].append(r)
+
+            # 4. AFFICHAGE sans aucun appel supplémentaire à la base de données
+            self.table.setRowCount(0)  # On vide la table avant de la remplir
+            total_rows = len(reservations_to_display) + len(grouped)
+            self.table.setRowCount(total_rows)
+
+            current_row = 0
+            for date_str, group in grouped.items():
+                # Ligne de titre pour la date
+                title_item = QTableWidgetItem(f"📅 Arrivées du {date_str}")
+                title_item.setFlags(Qt.ItemIsEnabled)
+                title_item.setFont(QFont("Segoe UI", 10, QFont.Bold))
+                title_item.setBackground(Qt.lightGray)
+                self.table.setSpan(current_row, 0, 1, self.table.columnCount())
+                self.table.setItem(current_row, 0, title_item)
+                current_row += 1
+
+                # Lignes pour chaque réservation de ce groupe
+                for r in group:
+                    # On utilise directement les champs fournis par le modèle
+                    self.table.setItem(current_row, 0, QTableWidgetItem(f"RES-{r['id']}"))
+                    self.table.setItem(current_row, 1, QTableWidgetItem(r.get('client', 'N/A')))
+                    self.table.setItem(current_row, 2, QTableWidgetItem(r.get('chambre', '?')))
+                    self.table.setItem(current_row, 3, QTableWidgetItem(r.get('date_arrivee')))
+                    self.table.setItem(current_row, 4, QTableWidgetItem(r.get('date_depart')))
+
+                    statut = r.get("statut", "inconnu")
+                    self.table.setItem(current_row, 5, QTableWidgetItem(statut.capitalize()))
+
+                    # Création des boutons d'action
+                    self.create_action_buttons(current_row, r['id'], statut)
+                    current_row += 1
+
+        except Exception as e:
+            QMessageBox.critical(self, "Erreur Critique",
+                                 f"Une erreur est survenue lors du chargement des réservations : {e}")
+
+    def create_action_buttons(self, row, reservation_id, statut):
+        """Crée et place les boutons d'action dans une cellule de la table."""
+        cell_widget = QWidget()
+        h_layout = QHBoxLayout(cell_widget)
+        h_layout.setContentsMargins(5, 0, 5, 0)
+        h_layout.setSpacing(5)
+
+        # Bouton Modifier (toujours visible sauf si annulée)
+        if statut != "annulée" and statut != "check-out":
+            btn_modifier = QPushButton("📝")
+            btn_modifier.setToolTip("Modifier la réservation")
+            btn_modifier.clicked.connect(lambda _, rid=reservation_id: self.modifier_reservation(rid))
+            h_layout.addWidget(btn_modifier)
+
+        # Bouton Annuler (visible seulement si 'réservée')
+        if statut == "réservée":
+            btn_annuler = QPushButton("❌")
+            btn_annuler.setToolTip("Annuler la réservation")
+            btn_annuler.clicked.connect(lambda _, rid=reservation_id: self.annuler_reservation(rid))
+            h_layout.addWidget(btn_annuler)
+
+        h_layout.addStretch()
+        self.table.setCellWidget(row, 6, cell_widget)
+
+    def modifier_reservation(self, reservation_id):
+        # La logique de modification est complexe, la garder ici est acceptable
+        # mais pourrait être déplacée dans une classe QDialog dédiée pour plus de clarté.
+        try:
+            res = self.reservation_controller.get_by_id(reservation_id)
+            if not res.get("success"):
+                QMessageBox.warning(self, "Erreur", res.get("error", "Réservation introuvable"))
+                return
+
+            # Le reste de votre logique de modification est bon...
+            # ... (code de la méthode modifier_reservation inchangé)
+            data = res["data"]
+            current_chambre_id = data["chambre_id"]
+            current_arrivee = QDate.fromString(data["date_arrivee"], "yyyy-MM-dd")
+            current_depart = QDate.fromString(data["date_depart"], "yyyy-MM-dd")
+
+            chambres_libres = [
+                ch for ch in self.chambre_model.get_all()
+                if ch["statut"] == "libre" or ch["id"] == current_chambre_id
+            ]
+
+            if not chambres_libres:
+                QMessageBox.information(self, "Info", "Aucune chambre disponible pour modification.")
+                return
+
+            dialog = QDialog(self)
+            dialog.setWindowTitle(f"Modifier réservation #{reservation_id}")
+            layout = QVBoxLayout(dialog)
+
+            # ... (le reste du code de la boîte de dialogue de modification est correct)
+            layout.addWidget(QLabel("Chambre :"))
+            combo_chambres = QComboBox()
+            id_to_index = {}
+            for i, ch in enumerate(chambres_libres):
+                combo_chambres.addItem(f"{ch['numero']} - {ch['prix_par_nuit']} FCFA/nuit", ch["id"])
+                id_to_index[ch["id"]] = i
+            combo_chambres.setCurrentIndex(id_to_index.get(current_chambre_id, 0))
+            layout.addWidget(combo_chambres)
+
+            layout.addWidget(QLabel("Date d'arrivée :"))
+            date_arrivee_edit = QDateEdit(current_arrivee)
+            date_arrivee_edit.setCalendarPopup(True)
+            layout.addWidget(date_arrivee_edit)
+
+            layout.addWidget(QLabel("Date de départ :"))
+            date_depart_edit = QDateEdit(current_depart)
+            date_depart_edit.setCalendarPopup(True)
+            layout.addWidget(date_depart_edit)
+
+            btn_layout = QHBoxLayout()
+            btn_valider = QPushButton("Valider")
+            btn_annuler = QPushButton("Annuler")
+            btn_layout.addWidget(btn_valider)
+            btn_layout.addWidget(btn_annuler)
+            layout.addLayout(btn_layout)
+
+            def valider():
+                new_chambre_id = combo_chambres.currentData()
+                new_arrivee = date_arrivee_edit.date()
+                new_depart = date_depart_edit.date()
+
+                if new_arrivee > new_depart:
+                    QMessageBox.warning(dialog, "Erreur", "La date de départ doit être après la date d'arrivée.")
+                    return
+
+                try:
+                    conflit = self.reservation_controller.check_conflit(
+                        new_chambre_id, new_arrivee.toString("yyyy-MM-dd"), new_depart.toString("yyyy-MM-dd"),
+                        exclude_id=reservation_id
+                    )
+                    if conflit:
+                        QMessageBox.warning(dialog, "Conflit", "La chambre est déjà réservée sur cette période.")
+                        return
+                except Exception as e:
+                    QMessageBox.warning(dialog, "Erreur", f"Erreur vérification disponibilité : {e}")
+                    return
+
+                update = self.reservation_controller.update(
+                    reservation_id,
+                    chambre_id=new_chambre_id,
+                    date_arrivee=new_arrivee.toString("yyyy-MM-dd"),
+                    date_depart=new_depart.toString("yyyy-MM-dd"),
+                )
+                if update.get("success"):
+                    QMessageBox.information(dialog, "Succès", "Réservation modifiée avec succès.")
+                    dialog.accept()
+                    self.refresh_table()
+                else:
+                    QMessageBox.warning(dialog, "Erreur", update.get("error", "Erreur inconnue"))
+
+            btn_valider.clicked.connect(valider)
+            btn_annuler.clicked.connect(dialog.reject)
+
+            dialog.setLayout(layout)
+            dialog.setFixedSize(400, 300)
+            dialog.exec()
+
+        except Exception as e:
+            QMessageBox.warning(self, "Erreur", str(e))
+
+    def annuler_reservation(self, reservation_id):
+        # Votre logique d'annulation est déjà très bonne.
+        try:
+            res = self.reservation_controller.get_by_id(reservation_id)
+            if not res.get("success"):
+                raise Exception(res.get("error", "Réservation introuvable"))
+
+            statut = res.get("data", {}).get("statut", "")
+            if statut != "réservée":
+                QMessageBox.warning(self, "Annulation impossible",
+                                    f"Seules les réservations avec le statut 'réservée' peuvent être annulées (statut actuel : '{statut}').")
+                return
+
+            confirm = QMessageBox.question(
+                self, "Confirmation", "Annuler cette réservation ?",
+                QMessageBox.Yes | QMessageBox.No
+            )
+
+            if confirm == QMessageBox.Yes:
+                cancel_res = self.reservation_controller.cancel(reservation_id)
+                if cancel_res.get("success"):
+                    QMessageBox.information(self, "Succès", "Réservation annulée.")
+                    self.refresh_table()
+                else:
+                    QMessageBox.warning(self, "Erreur", cancel_res.get("error", "Erreur lors de l'annulation."))
+
+        except Exception as e:
+            QMessageBox.warning(self, "Erreur", str(e))
+
+
+class ReservationFormDialog(QDialog):
+    def __init__(self, parent, chambre_model, reservation_controller):
+        super().__init__(parent)
+        self.setWindowTitle("Nouvelle réservation")
+        self.chambre_model = chambre_model
+        self.reservation_controller = reservation_controller
+
+        layout = QVBoxLayout(self)
+
+        # --- Groupe Client (inchangé) ---
         client_group = QGroupBox("Client")
         client_layout = QFormLayout()
-
         self.checkbox_new_client = QCheckBox("Nouveau client")
         self.checkbox_new_client.setChecked(True)
         self.checkbox_new_client.stateChanged.connect(self.toggle_client_mode)
-        self.layout.addWidget(self.checkbox_new_client)
-
+        client_layout.addRow(self.checkbox_new_client)
         self.combo_clients = QComboBox()
         self.load_clients()
         client_layout.addRow("Client existant :", self.combo_clients)
-
         self.input_nom = QLineEdit()
         self.input_prenom = QLineEdit()
         self.input_tel = QLineEdit()
         self.input_email = QLineEdit()
         self.input_cni = QLineEdit()
         self.input_adresse = QLineEdit()
-
         client_layout.addRow("Nom * :", self.input_nom)
         client_layout.addRow("Prénom :", self.input_prenom)
-        client_layout.addRow("Téléphone :", self.input_tel)
-        client_layout.addRow("Email :", self.input_email)
-        client_layout.addRow("CNI :", self.input_cni)
+        client_layout.addRow("Téléphone * :", self.input_tel)
+        client_layout.addRow("Email * :", self.input_email)
+        client_layout.addRow("CNI * :", self.input_cni)
         client_layout.addRow("Adresse :", self.input_adresse)
-
         client_group.setLayout(client_layout)
-        self.layout.addWidget(client_group)
+        layout.addWidget(client_group)
 
-        self.toggle_client_mode()
+        # --- Groupe Réservation (MODIFIÉ pour être plus clair et inclure les nouveaux champs) ---
+        resa_group = QGroupBox("Détails de la réservation")
+        form_layout = QFormLayout()  # Utilisation d'un QFormLayout pour un meilleur alignement
 
-        form_layout = QHBoxLayout()
-
-        form_layout.addWidget(QLabel("Chambre :"))
         self.combo_chambres = QComboBox()
         self.load_chambres()
-        self.combo_chambres.currentIndexChanged.connect(self.update_prix)
-        form_layout.addWidget(self.combo_chambres)
+        form_layout.addRow("Chambre :", self.combo_chambres)
 
-        form_layout.addWidget(QLabel("Date arrivée :"))
         self.date_arrivee = QDateEdit(QDate.currentDate())
         self.date_arrivee.setCalendarPopup(True)
-        self.date_arrivee.dateChanged.connect(self.update_prix)
-        form_layout.addWidget(self.date_arrivee)
+        form_layout.addRow("Date d'arrivée :", self.date_arrivee)
 
-        form_layout.addWidget(QLabel("Date départ :"))
         self.date_depart = QDateEdit(QDate.currentDate().addDays(1))
         self.date_depart.setCalendarPopup(True)
-        self.date_depart.dateChanged.connect(self.update_prix)
-        form_layout.addWidget(self.date_depart)
+        form_layout.addRow("Date de départ :", self.date_depart)
 
-        self.layout.addLayout(form_layout)
+        # --- AJOUT : Champs pour adultes et enfants ---
+        self.spin_adultes = QSpinBox()
+        self.spin_adultes.setRange(1, 10)  # De 1 à 10 adultes
+        self.spin_adultes.setValue(1)
+        form_layout.addRow("Nombre d'adultes :", self.spin_adultes)
+
+        self.spin_enfants = QSpinBox()
+        self.spin_enfants.setRange(0, 10)  # De 0 à 10 enfants
+        form_layout.addRow("Nombre d'enfants :", self.spin_enfants)
+
+        resa_group.setLayout(form_layout)
+        layout.addWidget(resa_group)
+        # --- FIN DES MODIFICATIONS ---
 
         prix_layout = QHBoxLayout()
         self.label_prix_nuit = QLabel("Prix par nuit : 0 FCFA")
@@ -86,37 +356,25 @@ class ReservationsPage(QWidget):
         prix_layout.addWidget(self.label_prix_nuit)
         prix_layout.addWidget(self.label_nb_nuits)
         prix_layout.addWidget(self.label_prix_total)
-        self.layout.addLayout(prix_layout)
+        layout.addLayout(prix_layout)
 
-        self.btn_reserver = QPushButton("Réserver")
-        self.btn_reserver.clicked.connect(self.action_reserver)
-        self.layout.addWidget(self.btn_reserver)
+        self.combo_chambres.currentIndexChanged.connect(self.update_prix)
+        self.date_arrivee.dateChanged.connect(self.update_prix)
+        self.date_depart.dateChanged.connect(self.update_prix)
 
-        btn_refresh = QPushButton("Actualiser")
-        btn_refresh.clicked.connect(self.refresh_table)
-        self.layout.addWidget(btn_refresh)
+        btn_reserver = QPushButton("Réserver")
+        btn_reserver.clicked.connect(self.action_reserver)
+        layout.addWidget(btn_reserver)
 
-        self.layout.addStretch()
-
+        self.toggle_client_mode()
         self.update_prix()
-
-        title = QLabel("Liste des Réservations")
-        title.setFont(QFont("Segoe UI", 20, QFont.Bold))
-        self.layout.addWidget(title)
-
-        self.table = QTableWidget()
-        self.table.setColumnCount(7)
-        self.table.setHorizontalHeaderLabels(["ID", "Client", "Chambre", "Arrivée", "Départ", "Statut", "Actions"])
-        self.table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
-        self.table.setEditTriggers(QAbstractItemView.NoEditTriggers)
-        self.layout.addWidget(self.table)
-
-        self.refresh_table()
+        self.setFixedSize(600, 550) # Augmenter un peu la hauteur pour les nouveaux champs
 
     def toggle_client_mode(self):
         nouveau = self.checkbox_new_client.isChecked()
         self.combo_clients.setEnabled(not nouveau)
-        for widget in [self.input_nom, self.input_prenom, self.input_tel, self.input_email, self.input_cni, self.input_adresse]:
+        for widget in [self.input_nom, self.input_prenom, self.input_tel, self.input_email, self.input_cni,
+                       self.input_adresse]:
             widget.setEnabled(nouveau)
 
     def load_clients(self):
@@ -125,17 +383,23 @@ class ReservationsPage(QWidget):
             res = ClientController.liste_clients()
             if not res.get("success", False):
                 raise Exception(res.get("error", "Erreur chargement clients"))
-            for c in res.get("clients", []):
-                self.combo_clients.addItem(f"{c.get('nom', '')} {c.get('prenom', '')}".strip(), c.get('id'))
+
+            # --- CORRECTION ICI ---
+            # On utilise la clé "data" au lieu de "clients"
+            clients_data = res.get("data", [])
+            for c in clients_data:
+                self.combo_clients.addItem(f"{c.get('nom', '')} {c.get('prenom', '')}".strip(), c.get("id"))
         except Exception as e:
             QMessageBox.warning(self, "Erreur", f"Erreur chargement clients : {e}")
+
 
     def load_chambres(self):
         self.combo_chambres.clear()
         try:
             for chambre in self.chambre_model.get_all():
                 if chambre['statut'] == 'libre':
-                    self.combo_chambres.addItem(f"{chambre['numero']} - {chambre['prix_par_nuit']} XOF/nuit", chambre['id'])
+                    self.combo_chambres.addItem(f"N° {chambre['numero']} - {chambre['prix_par_nuit']} FCFA/nuit",
+                                                chambre['id'])
         except Exception as e:
             QMessageBox.warning(self, "Erreur", f"Erreur chargement chambres : {e}")
 
@@ -143,17 +407,19 @@ class ReservationsPage(QWidget):
         chambre_id = self.combo_chambres.currentData()
         if chambre_id is None:
             self.label_prix_nuit.setText("Prix par nuit : 0 FCFA")
-            self.label_nb_nuits.setText("Nombre de nuits : FCFA")
+            self.label_nb_nuits.setText("Nombre de nuits : 0")
             self.label_prix_total.setText("Prix total : 0 FCFA")
             return
         try:
             chambre = self.chambre_model.get_by_id(chambre_id)
             prix_nuit = chambre['prix_par_nuit']
-            nb_nuits = max(0, self.date_arrivee.date().daysTo(self.date_depart.date()))
+            nb_nuits = self.date_arrivee.date().daysTo(self.date_depart.date())
+            if nb_nuits <= 0:
+                nb_nuits = 1
             prix_total = nb_nuits * prix_nuit
-            self.label_prix_nuit.setText(f"Prix par nuit : {prix_nuit} FCFA")
+            self.label_prix_nuit.setText(f"Prix par nuit : {prix_nuit:,.0f} FCFA")
             self.label_nb_nuits.setText(f"Nombre de nuits : {nb_nuits}")
-            self.label_prix_total.setText(f"Prix total : {prix_total} FCFA")
+            self.label_prix_total.setText(f"Prix total : {prix_total:,.0f} FCFA")
         except Exception as e:
             QMessageBox.warning(self, "Erreur", f"Erreur calcul prix : {e}")
 
@@ -163,12 +429,19 @@ class ReservationsPage(QWidget):
             QMessageBox.warning(self, "Erreur", "Veuillez sélectionner une chambre.")
             return
 
-        date_arrivee = self.date_arrivee.date().toString("yyyy-MM-dd")
-        date_depart = self.date_depart.date().toString("yyyy-MM-dd")
+        date_arrivee_qdate = self.date_arrivee.date()
+        date_depart_qdate = self.date_depart.date()
 
-        if self.date_arrivee.date() >= self.date_depart.date():
+        if date_arrivee_qdate < QDate.currentDate():
+            QMessageBox.warning(self, "Erreur", "La date d'arrivée ne peut pas être dans le passé.")
+            return
+
+        if date_depart_qdate < date_arrivee_qdate:
             QMessageBox.warning(self, "Erreur", "La date de départ doit être après la date d'arrivée.")
             return
+
+        date_arrivee = date_arrivee_qdate.toString("yyyy-MM-dd")
+        date_depart = date_depart_qdate.toString("yyyy-MM-dd")
 
         try:
             if self.reservation_controller.check_conflit(chambre_id, date_arrivee, date_depart):
@@ -198,7 +471,7 @@ class ReservationsPage(QWidget):
                 return
 
         try:
-            result = self.reservation_controller.create_reservation(
+            result = self.reservation_controller.create(
                 client_id, chambre_id, date_arrivee, date_depart
             )
             if not result.get("success", False):
@@ -207,163 +480,7 @@ class ReservationsPage(QWidget):
                 return
             reservation_id = result.get("reservation_id")
             QMessageBox.information(self, "Succès", f"Réservation créée avec l'ID {reservation_id}")
-
-            self.load_chambres()
-            self.load_clients()
-            self.update_prix()
-            for widget in [self.input_nom, self.input_prenom, self.input_tel, self.input_email, self.input_cni,
-                           self.input_adresse]:
-                widget.clear()
-            self.date_arrivee.setDate(QDate.currentDate())
-            self.date_depart.setDate(QDate.currentDate().addDays(1))
-            self.refresh_table()
+            self.accept()
 
         except Exception as e:
             QMessageBox.warning(self, "Erreur", f"Erreur lors de la création de réservation : {e}")
-
-    def make_annuler_handler(self, res_id):
-        return lambda checked: self.annuler_reservation(res_id)
-
-    def refresh_table(self):
-        try:
-            response = self.reservation_controller.list_reservations()
-            if not response.get("success", False):
-                QMessageBox.warning(self, "Erreur", response.get("error", "Erreur inconnue"))
-                return
-
-            reservations = response.get("data", [])
-            self.table.clearContents()
-            self.table.setRowCount(len(reservations))
-
-            # Charger tous les clients une fois
-            clients = {c['id']: c for c in ClientController.liste_clients().get("clients", [])}
-
-            # Charger toutes les chambres une fois
-            chambres = {ch['id']: ch for ch in self.chambre_model.get_all()}
-
-            for i, r in enumerate(reservations):
-                client = clients.get(r["client_id"], {})
-                chambre = chambres.get(r["chambre_id"], {})
-
-                self.table.setItem(i, 0, QTableWidgetItem(str(r["id"])))
-                self.table.setItem(i, 1, QTableWidgetItem(f"{client.get('nom', '')} {client.get('prenom', '')}"))
-                self.table.setItem(i, 2, QTableWidgetItem(chambre.get("numero", "?")))
-                self.table.setItem(i, 3, QTableWidgetItem(r["date_arrivee"]))
-                self.table.setItem(i, 4, QTableWidgetItem(r["date_depart"]))
-
-                statut = r.get("statut", "inconnu")
-                self.table.setItem(i, 5, QTableWidgetItem(statut.capitalize()))
-
-                # Créer un widget d'action
-                h_layout = QHBoxLayout()
-                h_layout.setContentsMargins(0, 0, 0, 0)
-                cell_widget = QWidget()
-                cell_widget.setLayout(h_layout)
-
-                if statut == "réservée":
-                    btn_annuler = QPushButton("Annuler")
-                    btn_annuler.clicked.connect(self.make_annuler_handler(r["id"]))
-                    h_layout.addWidget(btn_annuler)
-
-                    btn_modifier = QPushButton("Modifier")
-                    btn_modifier.clicked.connect(lambda _, rid=r["id"]: self.modifier_reservation(rid))
-                    h_layout.addWidget(btn_modifier)
-                else:
-                    btn_modifier = QPushButton("Modifier")
-                    btn_modifier.clicked.connect(lambda _, rid=r["id"]: self.modifier_reservation(rid))
-                    h_layout.addWidget(btn_modifier)
-
-
-                self.table.setCellWidget(i, 6, cell_widget)
-        except Exception as e:
-            QMessageBox.warning(self, "Erreur", f"Erreur chargement des réservations : {e}")
-
-    def modifier_reservation(self, reservation_id):
-        try:
-            res = self.reservation_controller.get_reservation(reservation_id)
-            if not res.get("success", False):
-                QMessageBox.warning(self, "Erreur", res.get("error", "Réservation introuvable"))
-                return
-
-            data = res["data"]
-            chambres_libres = [
-                ch for ch in self.chambre_model.get_all()
-                if ch["statut"] == "libre" or ch["id"] == data["chambre_id"]
-            ]
-
-            if not chambres_libres:
-                QMessageBox.information(self, "Info", "Aucune autre chambre disponible.")
-                return
-
-            # Boîte de dialogue personnalisée
-            dialog = QWidget()
-            dialog.setWindowTitle(f"Modifier la chambre - Réservation {reservation_id}")
-            layout = QVBoxLayout(dialog)
-
-            label = QLabel("Sélectionnez une nouvelle chambre :")
-            layout.addWidget(label)
-
-            combo = QComboBox()
-            id_to_index = {}
-            for i, ch in enumerate(chambres_libres):
-                combo.addItem(f"{ch['numero']} - {ch['prix_par_nuit']} FCFA/nuit", ch["id"])
-                id_to_index[ch["id"]] = i
-
-            combo.setCurrentIndex(id_to_index.get(data["chambre_id"], 0))
-            layout.addWidget(combo)
-
-            btn_ok = QPushButton("Valider le changement")
-            layout.addWidget(btn_ok)
-
-            def valider():
-                new_chambre_id = combo.currentData()
-                if new_chambre_id == data["chambre_id"]:
-                    QMessageBox.information(dialog, "Info", "La chambre sélectionnée est la même.")
-                    dialog.close()
-                    return
-
-                update = self.reservation_controller.update_reservation(reservation_id, chambre_id=new_chambre_id)
-                if update.get("success", False):
-                    QMessageBox.information(dialog, "Succès", update["message"])
-                    self.refresh_table()
-                    self.load_chambres()
-                else:
-                    QMessageBox.warning(dialog, "Erreur", update.get("error", "Erreur inconnue"))
-                dialog.close()
-
-            btn_ok.clicked.connect(valider)
-            dialog.setLayout(layout)
-            dialog.setFixedSize(400, 120)
-            dialog.show()
-
-        except Exception as e:
-            QMessageBox.warning(self, "Erreur", str(e))
-
-    def annuler_reservation(self, reservation_id):
-        try:
-            # Récupérer la réservation depuis le backend
-            res = self.reservation_controller.get_reservation(reservation_id)
-            if not res.get("success", False):
-                raise Exception(res.get("error", "Réservation introuvable"))
-
-            statut = res.get("data", {}).get("statut", "")
-            if statut != "réservée":
-                QMessageBox.warning(self, "Annulation impossible",
-                                    f"Seules les réservations avec le statut 'réservée' peuvent être annulées (statut actuel : '{statut}').")
-                return
-
-            confirm = QMessageBox.question(
-                self, "Confirmation",
-                "Annuler cette réservation ?",
-                QMessageBox.Yes | QMessageBox.No
-            )
-
-            if confirm == QMessageBox.Yes:
-                self.reservation_controller.cancel_reservation(reservation_id)
-                QMessageBox.information(self, "Succès", "Réservation annulée.")
-                self.refresh_table()
-                self.load_chambres()
-
-        except Exception as e:
-            QMessageBox.warning(self, "Erreur", str(e))
-

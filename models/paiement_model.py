@@ -1,63 +1,61 @@
+# /home/soutonnoma/PycharmProjects/HotelManger/models/paiement_model.py
 from models.base_model import BaseModel
 from datetime import datetime
+import sqlite3
 
 class PaiementModel(BaseModel):
 
     @classmethod
     def create(cls, facture_id, montant, methode, date_paiement=None):
-        conn = cls.connect()
-        cur = conn.cursor()
+        """Crée un nouvel enregistrement de paiement."""
+        query = "INSERT INTO paiements (facture_id, montant, methode, date_paiement) VALUES (?, ?, ?, ?)"
         try:
-            if date_paiement is None:
-                date_paiement = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            elif isinstance(date_paiement, datetime):
-                date_paiement = date_paiement.strftime("%Y-%m-%d %H:%M:%S")
+            with cls.connect() as conn:
+                if date_paiement is None:
+                    date_paiement = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                elif isinstance(date_paiement, datetime):
+                    date_paiement = date_paiement.strftime("%Y-%m-%d %H:%M:%S")
 
-            cur.execute("""
-                INSERT INTO paiements (facture_id, montant, methode, date_paiement)
-                VALUES (?, ?, ?, ?)
-            """, (facture_id, montant, methode, date_paiement))
-            conn.commit()
-            return cur.lastrowid
-        except Exception as e:
-            conn.rollback()
-            raise e
-        finally:
-            conn.close()
+                cur = conn.cursor()
+                cur.execute(query, (facture_id, montant, methode, date_paiement))
+                conn.commit()
+                return cur.lastrowid
+        except sqlite3.Error as e:
+            raise Exception(f"Erreur création paiement : {e}") from e
 
     @classmethod
     def get_by_facture(cls, facture_id):
-        conn = cls.connect()
-        cur = conn.cursor()
+        """Récupère tous les paiements pour une facture donnée."""
+        query = "SELECT * FROM paiements WHERE facture_id = ? ORDER BY date_paiement DESC"
         try:
-            cur.execute("""
-                SELECT id, facture_id, montant, methode, date_paiement
-                FROM paiements WHERE facture_id = ?
-                ORDER BY date_paiement DESC
-            """, (facture_id,))
-            rows = cur.fetchall()
-            return [
-                {
-                    "id": row[0],
-                    "facture_id": row[1],
-                    "montant": row[2],
-                    "methode": row[3],
-                    "date_paiement": row[4],
-                } for row in rows
-            ]
-        finally:
-            conn.close()
+            with cls.connect() as conn:
+                cur = conn.cursor()
+                cur.execute(query, (facture_id,))
+                return [dict(row) for row in cur.fetchall()]
+        except sqlite3.Error as e:
+            raise Exception(f"Erreur récupération paiements : {e}") from e
 
     @classmethod
     def delete(cls, paiement_id):
-        conn = cls.connect()
-        cur = conn.cursor()
+        """Supprime un paiement."""
+        query = "DELETE FROM paiements WHERE id = ?"
         try:
-            cur.execute("DELETE FROM paiements WHERE id = ?", (paiement_id,))
-            conn.commit()
-            return cur.rowcount > 0
-        except Exception:
-            conn.rollback()
-            raise
-        finally:
-            conn.close()
+            with cls.connect() as conn:
+                cur = conn.cursor()
+                cur.execute(query, (paiement_id,))
+                conn.commit()
+                return cur.rowcount > 0
+        except sqlite3.Error as e:
+            raise Exception(f"Erreur suppression paiement : {e}") from e
+
+    @classmethod
+    def get_all(cls):
+        """Récupère tous les paiements de la base de données."""
+        query = "SELECT * FROM paiements ORDER BY date_paiement DESC"
+        try:
+            with cls.connect() as conn:
+                cur = conn.cursor()
+                cur.execute(query)
+                return [dict(row) for row in cur.fetchall()]
+        except sqlite3.Error as e:
+            raise Exception(f"Erreur récupération de tous les paiements : {e}") from e

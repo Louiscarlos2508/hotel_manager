@@ -67,24 +67,26 @@ class ClientsPage(QWidget):
         layout.addWidget(self.btn_modifier)
 
     def charger_clients(self):
+        """Charge les clients et leurs informations dans le tableau."""
         self.table.setRowCount(0)
+        # La méthode du contrôleur est correcte
         result = ClientController.liste_clients_avec_reservations()
-        if not result["success"]:
-            QMessageBox.warning(self, "Erreur", result.get("error", "Erreur lors du chargement."))
+
+        if not result.get("success"):
+            QMessageBox.warning(self, "Erreur", result.get("error", "Impossible de charger les clients."))
             return
 
-        for client in result["clients"]:
-            row = self.table.rowCount()
+        # --- CORRECTION ICI ---
+        # On utilise la clé "data" et on ajoute .get("data", []) pour plus de sécurité
+        clients = result.get("data", [])
+        for row, client in enumerate(clients):
+            # ... (le reste de votre méthode pour remplir le tableau est probablement correct)
             self.table.insertRow(row)
-
-            self.table.setItem(row, 0, QTableWidgetItem(client["nom"]))
-            self.table.setItem(row, 1, QTableWidgetItem(client.get("prenom", "")))
+            self.table.setItem(row, 0, QTableWidgetItem(str(client.get("id"))))
+            self.table.setItem(row, 1, QTableWidgetItem(f"{client.get('nom', '')} {client.get('prenom', '')}".strip()))
             self.table.setItem(row, 2, QTableWidgetItem(client.get("tel", "")))
             self.table.setItem(row, 3, QTableWidgetItem(client.get("email", "")))
-            self.table.setItem(row, 4, QTableWidgetItem(client.get("cni", "")))
-            self.table.setItem(row, 5, QTableWidgetItem(client.get("adresse", "")))
-            self.table.setItem(row, 6, QTableWidgetItem(str(client.get("nb_reservations", 0))))
-
+            self.table.setItem(row, 4, QTableWidgetItem(str(client.get("nb_reservations", 0))))
             # Actions : Modifier + Supprimer si possible
             actions_widget = QWidget()
             layout = QHBoxLayout(actions_widget)

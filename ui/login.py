@@ -110,7 +110,7 @@ class LoginWindow(QMainWindow):
             self.home.show()
             self.hide()
         else:
-            QMessageBox.warning(self, "Erreur", "Identifiants invalides")
+            QMessageBox.warning(self, "Erreur", "Identifiants invalides ou Compte inactif")
 
     def show_again(self):
         self.username.clear()
