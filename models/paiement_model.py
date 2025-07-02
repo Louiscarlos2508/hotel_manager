@@ -1,6 +1,6 @@
 # /home/soutonnoma/PycharmProjects/HotelManger/models/paiement_model.py
 from models.base_model import BaseModel
-from datetime import datetime
+from datetime import datetime, timezone
 import sqlite3
 
 class PaiementModel(BaseModel):
@@ -26,7 +26,7 @@ class PaiementModel(BaseModel):
     @classmethod
     def get_by_facture(cls, facture_id):
         """Récupère tous les paiements pour une facture donnée."""
-        query = "SELECT * FROM paiements WHERE facture_id = ? ORDER BY date_paiement DESC"
+        query = "SELECT * FROM paiements WHERE facture_id = ? AND is_deleted = 0 ORDER BY date_paiement DESC"
         try:
             with cls.connect() as conn:
                 cur = conn.cursor()
@@ -38,11 +38,13 @@ class PaiementModel(BaseModel):
     @classmethod
     def delete(cls, paiement_id):
         """Supprime un paiement."""
-        query = "DELETE FROM paiements WHERE id = ?"
+
+        query = "UPDATE paiements SET is_deleted = 1, updated_at = ? WHERE id = ?"
+        timestamp_actuel = datetime.now(timezone.utc).isoformat()
         try:
             with cls.connect() as conn:
                 cur = conn.cursor()
-                cur.execute(query, (paiement_id,))
+                cur.execute(query, (timestamp_actuel, paiement_id,))
                 conn.commit()
                 return cur.rowcount > 0
         except sqlite3.Error as e:
@@ -51,7 +53,7 @@ class PaiementModel(BaseModel):
     @classmethod
     def get_all(cls):
         """Récupère tous les paiements de la base de données."""
-        query = "SELECT * FROM paiements ORDER BY date_paiement DESC"
+        query = "SELECT * FROM paiements WHERE is_deleted = 0 ORDER BY date_paiement DESC"
         try:
             with cls.connect() as conn:
                 cur = conn.cursor()

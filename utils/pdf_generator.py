@@ -53,7 +53,7 @@ def creer_facture_pdf(reservation_id: int):
         bureau = os.path.join(os.path.expanduser("~"), "Desktop")
         dossier_factures = os.path.join(bureau, "FacturesHotel")
         os.makedirs(dossier_factures, exist_ok=True)
-        chemin_pdf = os.path.join(dossier_factures, f"Facture_{facture['id']}_Client_{client['id']}.pdf")
+        chemin_pdf = os.path.join(dossier_factures, f"Facture_{facture['id']}_Client_{client['nom']}.pdf")
 
         doc = SimpleDocTemplate(chemin_pdf, pagesize=A4, topMargin=20 * mm, bottomMargin=20 * mm)
         story = []

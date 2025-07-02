@@ -1,4 +1,5 @@
 # /home/soutonnoma/PycharmProjects/HotelManger/models/facture_item_model.py
+from datetime import datetime, timezone
 from typing import List, Dict, Any, Optional
 
 from models.base_model import BaseModel
@@ -42,7 +43,7 @@ class FactureItemModel(BaseModel):
     @classmethod
     def get_by_facture(cls, facture_id: int) -> List[Dict[str, Any]]:
         """Récupère toutes les lignes d'une facture."""
-        query = "SELECT * FROM facture_items WHERE facture_id = ?"
+        query = "SELECT * FROM facture_items WHERE facture_id = ? AND is_deleted = 0"
         try:
             with cls.connect() as conn:
                 cur = conn.cursor()
@@ -58,11 +59,12 @@ class FactureItemModel(BaseModel):
     @classmethod
     def delete_by_facture(cls, facture_id: int):
         """Supprime TOUS les articles d'une facture donnée pour la nettoyer avant recalcul."""
-        query = "DELETE FROM facture_items WHERE facture_id = ?"
+        query = "UPDATE facture_items SET is_deleted = 1, updated_at = ? WHERE facture_id = ?"
+        timestamp_actuel = datetime.now(timezone.utc).isoformat()
         try:
             with cls.connect() as conn:
                 cur = conn.cursor()
-                cur.execute(query, (facture_id,))
+                cur.execute(query, (timestamp_actuel, facture_id,))
                 conn.commit()
         except sqlite3.Error as e:
             raise Exception(f"Erreur lors du nettoyage de la facture {facture_id} : {e}") from e

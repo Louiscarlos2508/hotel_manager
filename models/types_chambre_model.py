@@ -1,4 +1,6 @@
 # /home/soutonnoma/PycharmProjects/HotelManger/models/types_chambre_model.py
+from datetime import timezone, datetime
+
 from models.base_model import BaseModel
 import sqlite3
 
@@ -22,7 +24,7 @@ class TypesChambreModel(BaseModel):
     @classmethod
     def get_all(cls):
         """Récupère tous les types de chambre."""
-        query = "SELECT * FROM types_chambre ORDER BY nom ASC"
+        query = "SELECT * FROM types_chambre WHERE is_deleted = 0 ORDER BY nom ASC"
         try:
             with cls.connect() as conn:
                 cur = conn.cursor()
@@ -34,7 +36,7 @@ class TypesChambreModel(BaseModel):
     @classmethod
     def get_by_id(cls, type_id):
         """Récupère un type de chambre par son ID."""
-        query = "SELECT * FROM types_chambre WHERE id = ?"
+        query = "SELECT * FROM types_chambre WHERE id = ? AND is_deleted = 0"
         try:
             with cls.connect() as conn:
                 cur = conn.cursor()
@@ -47,11 +49,12 @@ class TypesChambreModel(BaseModel):
     @classmethod
     def update(cls, type_id, nom, description, prix_par_nuit):
         """Met à jour un type de chambre."""
-        query = "UPDATE types_chambre SET nom = ?, description = ?, prix_par_nuit = ? WHERE id = ?"
+        query = "UPDATE types_chambre SET nom = ?, description = ?, prix_par_nuit = ?, updated_at = ? WHERE id = ? AND is_deleted = 0"
+        timestamp_actuel = datetime.now(timezone.utc).isoformat()
         try:
             with cls.connect() as conn:
                 cur = conn.cursor()
-                cur.execute(query, (nom, description, prix_par_nuit, type_id))
+                cur.execute(query, (nom, description, prix_par_nuit, timestamp_actuel, type_id))
                 conn.commit()
                 return cur.rowcount > 0
         except sqlite3.Error as e:
@@ -60,11 +63,13 @@ class TypesChambreModel(BaseModel):
     @classmethod
     def delete(cls, type_id):
         """Supprime un type de chambre."""
-        query = "DELETE FROM types_chambre WHERE id = ?"
+
+        query = "UPDATE types_chambre SET is_deleted = 1, updated_at = ? WHERE id = ?"
+        timestamp_actuel = datetime.now(timezone.utc).isoformat()
         try:
             with cls.connect() as conn:
                 cur = conn.cursor()
-                cur.execute(query, (type_id,))
+                cur.execute(query, (timestamp_actuel, type_id,))
                 conn.commit()
                 return cur.rowcount > 0
         except sqlite3.Error as e:

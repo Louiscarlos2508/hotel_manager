@@ -1,4 +1,5 @@
 # /home/soutonnoma/PycharmProjects/HotelManger/models/commande_item_model.py
+from datetime import datetime, timezone
 from typing import List, Dict, Any
 import sqlite3
 from models.base_model import BaseModel
@@ -28,7 +29,7 @@ class CommandeItemModel(BaseModel):
             SELECT ci.*, p.nom AS produit_nom
             FROM commande_items ci
             JOIN produits p ON ci.produit_id = p.id
-            WHERE ci.commande_id = ?
+            WHERE ci.commande_id = ? AND ci.is_deleted = 0
         """
         try:
             with cls.connect() as conn:
@@ -41,11 +42,12 @@ class CommandeItemModel(BaseModel):
     @classmethod
     def delete(cls, item_id: int) -> bool:
         """Supprime un article d'une commande."""
-        query = "DELETE FROM commande_items WHERE id = ?"
+        query = "UPDATE commande_items SET is_deleted = 1, updated_at = ? WHERE id = ?"
+        timestamp_actuel = datetime.now(timezone.utc).isoformat()
         try:
             with cls.connect() as conn:
                 cur = conn.cursor()
-                cur.execute(query, (item_id,))
+                cur.execute(query, (timestamp_actuel, item_id,))
                 conn.commit()
                 return cur.rowcount > 0
         except sqlite3.Error as e:
@@ -58,6 +60,7 @@ class CommandeItemModel(BaseModel):
             SELECT ci.*, p.nom AS produit_nom
             FROM commande_items ci
             LEFT JOIN produits p ON ci.produit_id = p.id
+            WHERE ci.is_deleted = 0
         """
         try:
             with cls.connect() as conn:
@@ -78,6 +81,7 @@ class CommandeItemModel(BaseModel):
                 c.date_commande
             FROM commande_items ci
             JOIN commandes c ON ci.commande_id = c.id
+            WHERE c.is_deleted = 0
         """
         try:
             with cls.connect() as conn:
@@ -106,7 +110,7 @@ class CommandeItemModel(BaseModel):
             JOIN reservations r ON cmd.reservation_id = r.id
             JOIN clients cl ON r.client_id = cl.id
             JOIN chambres ch ON r.chambre_id = ch.id
-            WHERE cmd.lieu_consommation = ?
+            WHERE cmd.lieu_consommation = ? AND cmd.is_deleted = 0
             ORDER BY cmd.date_commande DESC, cl.nom;
         """
         try:

@@ -1,4 +1,6 @@
 # /home/soutonnoma/PycharmProjects/HotelManger/models/chambre_model.py
+from datetime import datetime, timezone
+
 from models.base_model import BaseModel
 import sqlite3
 
@@ -25,7 +27,8 @@ class ChambreModel(BaseModel):
         query = """
             SELECT c.id, c.numero, c.statut, tc.nom AS type_nom, tc.prix_par_nuit
             FROM chambres c
-            JOIN types_chambre tc ON c.type_id = tc.id
+            JOIN types_chambre tc ON c.type_id = tc.id 
+            WHERE c.is_deleted = 0
             ORDER BY c.numero
         """
         try:
@@ -43,7 +46,7 @@ class ChambreModel(BaseModel):
             SELECT c.id, c.numero, c.type_id, c.statut, tc.nom AS type_nom, tc.prix_par_nuit
             FROM chambres c
             JOIN types_chambre tc ON c.type_id = tc.id
-            WHERE c.id = ?
+            WHERE c.id = ? AND c.is_deleted = 0
         """
         try:
             with cls.connect() as conn:
@@ -57,11 +60,12 @@ class ChambreModel(BaseModel):
     @classmethod
     def update(cls, chambre_id, numero, type_id, statut):
         """Met à jour les informations d'une chambre."""
-        query = "UPDATE chambres SET numero = ?, type_id = ?, statut = ? WHERE id = ?"
+        query = "UPDATE chambres SET numero = ?, type_id = ?, statut = ?, updated_at = ? WHERE id = ? AND is_deleted = 0"
+        timestamp_actuel = datetime.now(timezone.utc).isoformat()
         try:
             with cls.connect() as conn:
                 cursor = conn.cursor()
-                cursor.execute(query, (numero, type_id, statut, chambre_id))
+                cursor.execute(query, (numero, type_id, statut, timestamp_actuel, chambre_id))
                 conn.commit()
                 return cursor.rowcount > 0
         except sqlite3.Error as e:
@@ -70,11 +74,12 @@ class ChambreModel(BaseModel):
     @classmethod
     def delete(cls, chambre_id):
         """Supprime une chambre."""
-        query = "DELETE FROM chambres WHERE id = ?"
+        query = "UPDATE chambres SET is_deleted = 1, updated_at = ? WHERE id = ?"
+        timestamp_actuel = datetime.now(timezone.utc).isoformat()
         try:
             with cls.connect() as conn:
                 cursor = conn.cursor()
-                cursor.execute(query, (chambre_id,))
+                cursor.execute(query, (timestamp_actuel, chambre_id,))
                 conn.commit()
                 return cursor.rowcount > 0
         except sqlite3.Error as e:
@@ -83,7 +88,7 @@ class ChambreModel(BaseModel):
     @classmethod
     def get_all_types(cls):
         """Récupère tous les types de chambre disponibles."""
-        query = "SELECT id, nom, prix_par_nuit FROM types_chambre ORDER BY nom"
+        query = "SELECT id, nom, prix_par_nuit FROM types_chambre WHERE is_deleted = 0 ORDER BY nom"
         try:
             with cls.connect() as conn:
                 cursor = conn.cursor()
@@ -106,7 +111,7 @@ class ChambreModel(BaseModel):
                 WHERE r.statut != 'annulée' AND (
                     r.date_arrivee < ? AND r.date_depart > ?
                 )
-            )
+            ) AND c.is_deleted = 0
             ORDER BY c.numero
         """
         try:

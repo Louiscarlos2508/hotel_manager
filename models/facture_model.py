@@ -1,4 +1,6 @@
 # /home/soutonnoma/PycharmProjects/HotelManger/models/facture_model.py
+from datetime import datetime, timezone
+
 from models.base_model import BaseModel
 import sqlite3
 
@@ -20,7 +22,7 @@ class FactureModel(BaseModel):
 
     @classmethod
     def get_by_reservation(cls, reservation_id):
-        query = "SELECT * FROM factures WHERE reservation_id = ?"
+        query = "SELECT * FROM factures WHERE reservation_id = ? AND is_deleted = 0"
         try:
             with cls.connect() as conn:
                 cur = conn.cursor()
@@ -32,11 +34,12 @@ class FactureModel(BaseModel):
 
     @classmethod
     def update_statut(cls, facture_id, nouveau_statut):
-        query = "UPDATE factures SET statut = ? WHERE id = ?"
+        query = "UPDATE factures SET statut = ?, updated_at = ? WHERE id = ? AND is_deleted = 0"
+        timestamp_actuel = datetime.now(timezone.utc).isoformat()
         try:
             with cls.connect() as conn:
                 cur = conn.cursor()
-                cur.execute(query, (nouveau_statut, facture_id))
+                cur.execute(query, (nouveau_statut, timestamp_actuel, facture_id))
                 conn.commit()
                 return cur.rowcount > 0
         except sqlite3.Error as e:
@@ -47,13 +50,14 @@ class FactureModel(BaseModel):
         """Met à jour les montants détaillés (HT, TVA, TTC) et le montant payé d'une facture."""
         query = """
             UPDATE factures 
-            SET montant_total_ht = ?, montant_total_tva = ?, montant_total_ttc = ?, montant_paye = ? 
-            WHERE id = ?
+            SET montant_total_ht = ?, montant_total_tva = ?, montant_total_ttc = ?, montant_paye = ?, updated_at = ? 
+            WHERE id = ? AND is_deleted = 0
         """
+        timestamp_actuel = datetime.now(timezone.utc).isoformat()
         try:
             with cls.connect() as conn:
                 cur = conn.cursor()
-                cur.execute(query, (montant_total_ht, montant_total_tva, montant_total_ttc, montant_paye, facture_id))
+                cur.execute(query, (montant_total_ht, montant_total_tva, montant_total_ttc, montant_paye, timestamp_actuel, facture_id))
                 conn.commit()
                 return cur.rowcount > 0
         except sqlite3.Error as e:
@@ -61,11 +65,13 @@ class FactureModel(BaseModel):
 
     @classmethod
     def delete(cls, facture_id):
-        query = "DELETE FROM factures WHERE id = ?"
+
+        query = "UPDATE factures SET is_deleted = 1, updated_at = ? WHERE id = ?"
+        timestamp_actuel = datetime.now(timezone.utc).isoformat()
         try:
             with cls.connect() as conn:
                 cur = conn.cursor()
-                cur.execute(query, (facture_id,))
+                cur.execute(query, (timestamp_actuel, facture_id,))
                 conn.commit()
                 return cur.rowcount > 0
         except sqlite3.Error as e:
@@ -74,7 +80,7 @@ class FactureModel(BaseModel):
     @classmethod
     def get_by_id(cls, facture_id):
         """Récupère une facture par son ID."""
-        query = "SELECT * FROM factures WHERE id = ?"
+        query = "SELECT * FROM factures WHERE id = ? AND is_deleted = 0"
         try:
             with cls.connect() as conn:
                 cur = conn.cursor()

@@ -1,4 +1,6 @@
 # /home/soutonnoma/PycharmProjects/HotelManger/models/hotel_info_model.py
+from datetime import datetime, timezone
+
 from models.base_model import BaseModel
 import sqlite3
 
@@ -26,10 +28,11 @@ class HotelInfoModel(BaseModel):
                 cur = conn.cursor()
                 # --- MODIFICATION : On insère les nouvelles colonnes ---
                 query = """
-                    INSERT OR REPLACE INTO hotel_info (id, nom, adresse, telephone, email, siret, tva_hebergement, tva_restauration, tdt_par_personne)
-                    VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?)
+                    INSERT OR REPLACE INTO hotel_info (id, nom, adresse, telephone, email, siret, tva_hebergement, tva_restauration, tdt_par_personne, updated_at)
+                    VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """
-                cur.execute(query, (nom, adresse, telephone, email, siret, tva_hebergement, tva_restauration, tdt_par_personne))
+                timestamp_actuel = datetime.now(timezone.utc).isoformat()
+                cur.execute(query, (nom, adresse, telephone, email, siret, tva_hebergement, tva_restauration, tdt_par_personne, timestamp_actuel))
                 conn.commit()
         except sqlite3.Error as e:
             raise Exception(f"Erreur sauvegarde info hôtel : {e}") from e

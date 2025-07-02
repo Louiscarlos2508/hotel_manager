@@ -1,4 +1,6 @@
 # /home/soutonnoma/PycharmProjects/HotelManger/models/service_demande_model.py
+from datetime import datetime, timezone
+
 from models.base_model import BaseModel
 import sqlite3
 
@@ -26,6 +28,7 @@ class ServiceDemandeModel(BaseModel):
             JOIN services_disponibles s ON sd.service_id = s.id
             JOIN reservations r ON sd.reservation_id = r.id
             JOIN clients c ON r.client_id = c.id
+            WHERE sd.is_deleted = 0
             ORDER BY sd.date_demande DESC
         """
         try:
@@ -43,7 +46,7 @@ class ServiceDemandeModel(BaseModel):
             SELECT sd.*, s.nom_service
             FROM services_demandes sd
             JOIN services_disponibles s ON sd.service_id = s.id
-            WHERE sd.reservation_id = ?
+            WHERE sd.reservation_id = ? AND sd.is_deleted = 0
             ORDER BY sd.date_demande
         """
         try:
@@ -57,11 +60,12 @@ class ServiceDemandeModel(BaseModel):
     @classmethod
     def update_statut(cls, demande_id, nouveau_statut):
         """Met à jour le statut d'une demande de service."""
-        query = "UPDATE services_demandes SET statut = ? WHERE id = ?"
+        query = "UPDATE services_demandes SET statut = ?, updated_at = ? WHERE id = ? AND is_deleted = 0"
+        timestamp_actuel = datetime.now(timezone.utc).isoformat()
         try:
             with cls.connect() as conn:
                 cur = conn.cursor()
-                cur.execute(query, (nouveau_statut, demande_id))
+                cur.execute(query, (nouveau_statut, timestamp_actuel, demande_id))
                 conn.commit()
                 return cur.rowcount > 0
         except sqlite3.Error as e:
@@ -70,11 +74,13 @@ class ServiceDemandeModel(BaseModel):
     @classmethod
     def delete(cls, demande_id):
         """Supprime une demande de service."""
-        query = "DELETE FROM services_demandes WHERE id = ?"
+
+        query = "UPDATE services_demandes SET is_deleted = 1, updated_at = ? WHERE id = ?"
+        timestamp_actuel = datetime.now(timezone.utc).isoformat()
         try:
             with cls.connect() as conn:
                 cur = conn.cursor()
-                cur.execute(query, (demande_id,))
+                cur.execute(query, (timestamp_actuel, demande_id,))
                 conn.commit()
                 return cur.rowcount > 0
         except sqlite3.Error as e:

@@ -34,9 +34,9 @@ class ClientsPage(QWidget):
         layout.addLayout(search_layout)
 
         # Tableau des clients
-        self.table = QTableWidget(0, 8)
+        self.table = QTableWidget(0, 6)
         self.table.setHorizontalHeaderLabels([
-            "Nom", "Prénom", "Téléphone", "Email", "CNI", "Adresse", "Nb réservations", "Actions"
+            "ID", "Nom et Prénom", "Téléphone", "Email", "Nb réservations", "Actions"
         ])
         self.table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         self.table.verticalHeader().setVisible(False)
@@ -102,7 +102,7 @@ class ClientsPage(QWidget):
                 layout.addWidget(btn_suppr)
 
             layout.addStretch()
-            self.table.setCellWidget(row, 7, actions_widget)
+            self.table.setCellWidget(row, 5, actions_widget)
 
     def supprimer_client(self, client):
         reply = QMessageBox.question(

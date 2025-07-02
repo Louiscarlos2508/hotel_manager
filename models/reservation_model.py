@@ -1,4 +1,5 @@
 # /home/soutonnoma/PycharmProjects/HotelManger/models/reservation_model.py
+from datetime import datetime, timezone
 
 from models.base_model import BaseModel
 
@@ -22,49 +23,71 @@ class ReservationModel(BaseModel):
             """, (client_id, chambre_id, date_arrivee, date_depart, nb_adultes, nb_enfants, prix_total_nuitee_estime))
             reservation_id = cur.lastrowid
 
-            cur.execute("UPDATE chambres SET statut = 'occupée' WHERE id = ?", (chambre_id,))
+            timestamp = datetime.now(timezone.utc).isoformat()
+            cur.execute("UPDATE chambres SET statut = 'occupée', updated_at = ? WHERE id = ? AND is_deleted = 0", (timestamp, chambre_id,))
             conn.commit()
             return reservation_id
 
+
     @classmethod
     def perform_checkin(cls, reservation_id: int) -> bool:
+        """Passe une réservation en statut 'check-in'."""
+        timestamp = datetime.now(timezone.utc).isoformat()
         with cls.connect() as conn:
             cur = conn.cursor()
-            cur.execute("UPDATE reservations SET statut = 'check-in' WHERE id = ?", (reservation_id,))
+            cur.execute(
+                "UPDATE reservations SET statut = 'check-in', updated_at = ? WHERE id = ? AND is_deleted = 0",
+                (timestamp, reservation_id)
+            )
             conn.commit()
             return cur.rowcount > 0
 
     @classmethod
     def perform_cancel(cls, reservation_id: int) -> bool:
+        """Annule une réservation et libère la chambre."""
+        timestamp = datetime.now(timezone.utc).isoformat()
         with cls.connect() as conn:
             cur = conn.cursor()
-            cur.execute("SELECT chambre_id FROM reservations WHERE id = ?", (reservation_id,))
+            cur.execute("SELECT chambre_id FROM reservations WHERE id = ? AND is_deleted = 0", (reservation_id,))
             resa = cur.fetchone()
             if not resa:
                 return False
 
-            cur.execute("UPDATE reservations SET statut = 'annulée' WHERE id = ?", (reservation_id,))
-            cur.execute("UPDATE chambres SET statut = 'libre' WHERE id = ?", (resa['chambre_id'],))
+            chambre_id = resa["chambre_id"]
+            cur.execute(
+                "UPDATE reservations SET statut = 'annulée', updated_at = ? WHERE id = ? AND is_deleted = 0",
+                (timestamp, reservation_id)
+            )
+            cur.execute(
+                "UPDATE chambres SET statut = 'libre', updated_at = ? WHERE id = ? AND is_deleted = 0",
+                (timestamp, chambre_id)
+            )
             conn.commit()
-            return cur.rowcount > 0
+            return True
 
     @classmethod
     def perform_checkout(cls, reservation_id: int, chambre_id: int, date_depart_reelle: str) -> bool:
         """
-        Met à jour le statut de la réservation et de la chambre lors du check-out.
-        Le montant final est géré par la facture.
+        Effectue le check-out :
+        - met à jour la date de départ réelle et le statut de la réservation
+        - libère la chambre
         """
+        timestamp = datetime.now(timezone.utc).isoformat()
         with cls.connect() as conn:
             cur = conn.cursor()
-            # --- MODIFICATION : On ne met plus à jour le prix ici ---
+
             cur.execute("""
-                    UPDATE reservations 
-                    SET statut = 'check-out', date_depart = ?
-                    WHERE id = ?
-                """, (date_depart_reelle, reservation_id))
-            cur.execute("UPDATE chambres SET statut = 'libre' WHERE id = ?", (chambre_id,))
+                UPDATE reservations
+                SET statut = 'check-out', date_depart = ?, updated_at = ?
+                WHERE id = ? AND is_deleted = 0
+            """, (date_depart_reelle, timestamp, reservation_id))
+
+            cur.execute(
+                "UPDATE chambres SET statut = 'libre', updated_at = ? WHERE id = ? AND is_deleted = 0",
+                (timestamp, chambre_id)
+            )
+
             conn.commit()
-            # On vérifie que la réservation a bien été modifiée
             return cur.rowcount > 0
 
     @classmethod
@@ -79,6 +102,7 @@ class ReservationModel(BaseModel):
                 FROM reservations r
                 JOIN clients c ON r.client_id = c.id
                 JOIN chambres ch ON r.chambre_id = ch.id
+                WHERE r.is_deleted = 0
                 ORDER BY r.date_arrivee DESC
             """)
             return [dict(row) for row in cur.fetchall()]
@@ -87,31 +111,40 @@ class ReservationModel(BaseModel):
     def get_by_id(cls, reservation_id):
         with cls.connect() as conn:
             cur = conn.cursor()
-            cur.execute("SELECT * FROM reservations WHERE id = ?", (reservation_id,))
+            cur.execute("SELECT * FROM reservations WHERE id = ? AND is_deleted = 0", (reservation_id,))
             row = cur.fetchone()
             return dict(row) if row else None
+
 
     @classmethod
     def update(cls, reservation_id, **kwargs):
         if not kwargs:
             return False
 
+        timestamp = datetime.now(timezone.utc).isoformat()
+
         with cls.connect() as conn:
             cur = conn.cursor()
-            if "chambre_id" in kwargs:
-                cur.execute("SELECT chambre_id FROM reservations WHERE id = ?", (reservation_id,))
-                row = cur.fetchone()
-                if not row: return False
-                ancienne_chambre_id = row['chambre_id']
-                nouvelle_chambre_id = kwargs["chambre_id"]
-                if ancienne_chambre_id != nouvelle_chambre_id:
-                    cur.execute("UPDATE chambres SET statut = 'libre' WHERE id = ?", (ancienne_chambre_id,))
-                    cur.execute("UPDATE chambres SET statut = 'occupée' WHERE id = ?", (nouvelle_chambre_id,))
 
+            if "chambre_id" in kwargs:
+                cur.execute("SELECT chambre_id FROM reservations WHERE id = ? AND is_deleted = 0", (reservation_id,))
+                row = cur.fetchone()
+                if not row:
+                    return False
+                ancienne_chambre_id = row["chambre_id"]
+                nouvelle_chambre_id = kwargs["chambre_id"]
+
+                if ancienne_chambre_id != nouvelle_chambre_id:
+                    cur.execute("UPDATE chambres SET statut = 'libre', updated_at = ? WHERE id = ? AND is_deleted = 0",
+                                (timestamp, ancienne_chambre_id))
+                    cur.execute("UPDATE chambres SET statut = 'occupée', updated_at = ? WHERE id = ? AND is_deleted = 0",
+                                (timestamp, nouvelle_chambre_id))
+
+            # Construction de la requête dynamique
             fields = ", ".join([f"{key} = ?" for key in kwargs])
-            params = list(kwargs.values())
-            params.append(reservation_id)
-            query = f"UPDATE reservations SET {fields} WHERE id = ?"
+            query = f"UPDATE reservations SET {fields}, updated_at = ? WHERE id = ? AND is_deleted = 0"
+            params = list(kwargs.values()) + [timestamp, reservation_id]
+
             cur.execute(query, tuple(params))
             conn.commit()
             return cur.rowcount > 0
@@ -125,7 +158,7 @@ class ReservationModel(BaseModel):
                 FROM reservations r
                 JOIN clients c ON r.client_id = c.id
                 JOIN chambres ch ON r.chambre_id = ch.id
-                WHERE 1=1
+                WHERE 1=1 AND r.is_deleted = 0
             """
             params = []
             if filtre:

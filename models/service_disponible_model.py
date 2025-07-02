@@ -1,4 +1,6 @@
 # /home/soutonnoma/PycharmProjects/HotelManger/models/service_disponible_model.py
+from datetime import datetime, timezone
+
 from models.base_model import BaseModel
 import sqlite3
 
@@ -22,7 +24,7 @@ class ServiceDisponibleModel(BaseModel):
     @classmethod
     def get_all(cls):
         """Récupère tous les services disponibles."""
-        query = "SELECT * FROM services_disponibles ORDER BY nom_service"
+        query = "SELECT * FROM services_disponibles WHERE is_deleted = 0 ORDER BY nom_service"
         try:
             with cls.connect() as conn:
                 cur = conn.cursor()
@@ -34,7 +36,7 @@ class ServiceDisponibleModel(BaseModel):
     @classmethod
     def get_by_id(cls, service_id):
         """Récupère un service par son ID."""
-        query = "SELECT * FROM services_disponibles WHERE id = ?"
+        query = "SELECT * FROM services_disponibles WHERE id = ? AND is_deleted = 0"
         try:
             with cls.connect() as conn:
                 cur = conn.cursor()
@@ -46,35 +48,41 @@ class ServiceDisponibleModel(BaseModel):
 
     @classmethod
     def update(cls, service_id, **kwargs):
-        """Met à jour un service."""
+        """Met à jour un service (version simplifiée et robuste)."""
         allowed_fields = {"nom_service", "description", "prix"}
-        fields = []
-        values = []
-        for key, value in kwargs.items():
-            if key in allowed_fields:
-                fields.append(f"{key} = ?")
-                values.append(value)
-        if not fields:
-            return False
-        values.append(service_id)
-        query = f"UPDATE services_disponibles SET {', '.join(fields)} WHERE id = ?"
+        fields_to_update = {k: v for k, v in kwargs.items() if k in allowed_fields and v is not None}
+
+        if not fields_to_update:
+            return True  # Aucune mise à jour nécessaire
+
+        # On ajoute le timestamp pour la synchronisation
+        fields_to_update['updated_at'] = datetime.now(timezone.utc).isoformat()
+
+        set_clause = ", ".join([f"{key} = ?" for key in fields_to_update])
+        query = f"UPDATE services_disponibles SET {set_clause} WHERE id = ? AND is_deleted = 0"
+
+        params = list(fields_to_update.values()) + [service_id]
+
         try:
             with cls.connect() as conn:
                 cur = conn.cursor()
-                cur.execute(query, tuple(values))
+                cur.execute(query, tuple(params))
                 conn.commit()
                 return cur.rowcount > 0
         except sqlite3.Error as e:
             raise Exception(f"Erreur mise à jour service : {e}") from e
 
+
     @classmethod
     def delete(cls, service_id):
         """Supprime un service."""
-        query = "DELETE FROM services_disponibles WHERE id = ?"
+
+        query = "UPDATE services_disponibles SET is_deleted = 1, updated_at = ? WHERE id = ?"
+        timestamp_actuel = datetime.now(timezone.utc).isoformat()
         try:
             with cls.connect() as conn:
                 cur = conn.cursor()
-                cur.execute(query, (service_id,))
+                cur.execute(query, (timestamp_actuel, service_id,))
                 conn.commit()
                 return cur.rowcount > 0
         except sqlite3.Error as e:

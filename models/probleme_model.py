@@ -1,7 +1,7 @@
 # /home/soutonnoma/PycharmProjects/HotelManger/models/probleme_model.py
 from models.base_model import BaseModel
 import sqlite3
-from datetime import datetime
+from datetime import datetime, timezone
 
 
 class ProblemeModel(BaseModel):
@@ -27,6 +27,7 @@ class ProblemeModel(BaseModel):
             FROM problemes p
             JOIN chambres ch ON p.chambre_id = ch.id
             LEFT JOIN users u ON p.signale_par_user_id = u.id
+            WHERE p.is_deleted = 0
             ORDER BY p.date_signalement DESC
         """
         try:
@@ -40,7 +41,7 @@ class ProblemeModel(BaseModel):
     @classmethod
     def get_by_id(cls, probleme_id):
         """Récupère un problème par son ID."""
-        query = "SELECT * FROM problemes WHERE id = ?"
+        query = "SELECT * FROM problemes WHERE id = ? AND is_deleted = 0"
         try:
             with cls.connect() as conn:
                 cur = conn.cursor()
@@ -53,13 +54,14 @@ class ProblemeModel(BaseModel):
     @classmethod
     def update_statut(cls, probleme_id, nouveau_statut):
         """Met à jour le statut d'un problème et la date de résolution si nécessaire."""
-        query = "UPDATE problemes SET statut = ?, date_resolution = ? WHERE id = ?"
+        query = "UPDATE problemes SET statut = ?, date_resolution = ?, updated_at = ? WHERE id = ? AND is_deleted = 0"
+        timestamp_actuel = datetime.now(timezone.utc).isoformat()
         date_resolution = datetime.now().strftime("%Y-%m-%d %H:%M:%S") if nouveau_statut == "Résolu" else None
 
         try:
             with cls.connect() as conn:
                 cur = conn.cursor()
-                cur.execute(query, (nouveau_statut, date_resolution, probleme_id))
+                cur.execute(query, (nouveau_statut, date_resolution, timestamp_actuel, probleme_id))
                 conn.commit()
                 return cur.rowcount > 0
         except sqlite3.Error as e:
@@ -68,11 +70,13 @@ class ProblemeModel(BaseModel):
     @classmethod
     def delete(cls, probleme_id):
         """Supprime un problème."""
-        query = "DELETE FROM problemes WHERE id = ?"
+
+        query = "UPDATE problemes SET is_deleted = 1, updated_at = ? WHERE id = ?"
+        timestamp_actuel = datetime.now(timezone.utc).isoformat()
         try:
             with cls.connect() as conn:
                 cur = conn.cursor()
-                cur.execute(query, (probleme_id,))
+                cur.execute(query, (timestamp_actuel, probleme_id,))
                 conn.commit()
                 return cur.rowcount > 0
         except sqlite3.Error as e:
