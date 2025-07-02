@@ -1,4 +1,4 @@
-# /home/soutonnoma/PycharmProjects/HotelManger/utils/pdf_generator.py
+# /home/soutonnoma/PycharmProjects/HotelManager/utils/pdf_generator.py
 
 import os
 from datetime import date

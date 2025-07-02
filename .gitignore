@@ -10,9 +10,11 @@ build/
 
 # Virtual envs
 venv/
+.venv1
 env/
 ENV/
 .venv/
+.venv1/
 .python-version
 
 # Jupyter Notebook

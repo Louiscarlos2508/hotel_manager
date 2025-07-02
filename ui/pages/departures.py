@@ -1,4 +1,4 @@
-# /home/soutonnoma/PycharmProjects/HotelManger/ui/pages/departures.py
+# /home/soutonnoma/PycharmProjects/HotelManager/ui/pages/departures.py
 
 import os
 from datetime import date, datetime

@@ -1,4 +1,4 @@
-# /home/soutonnoma/PycharmProjects/HotelManger/models/log_model.py
+# /home/soutonnoma/PycharmProjects/HotelManager/models/log_model.py
 import sqlite3
 from models.base_model import BaseModel
 

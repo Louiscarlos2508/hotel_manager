@@ -1,4 +1,4 @@
-# /home/soutonnoma/PycharmProjects/HotelManger/controllers/client_controller.py
+# /home/soutonnoma/PycharmProjects/HotelManager/controllers/client_controller.py
 
 from models.client_model import ClientModel
 

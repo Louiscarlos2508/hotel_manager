@@ -1,4 +1,4 @@
-# /home/soutonnoma/PycharmProjects/HotelManger/models/types_chambre_model.py
+# /home/soutonnoma/PycharmProjects/HotelManager/models/types_chambre_model.py
 from datetime import timezone, datetime
 
 from models.base_model import BaseModel

@@ -1,11 +1,11 @@
-# /home/soutonnoma/PycharmProjects/HotelManger/ui/center_utils.py
+# /home/soutonnoma/PycharmProjects/HotelManager/ui/center_utils.py
 
 from PySide6.QtWidgets import QApplication
 
 def center_on_screen(widget):
     """
     Fonction utilitaire pour centrer n'importe quel widget/fenêtre sur l'écran principal.
-    Doit être appelée APRÈS que le widget a été affiché avec .show().
+    Doit être appelée APRÈS que le widget a été affiché avec. Show().
     """
     try:
         # Récupère le rectangle de l'écran avec lequel se trouve la fenêtre

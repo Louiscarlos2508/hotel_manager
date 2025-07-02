@@ -1,4 +1,4 @@
-# /home/soutonnoma/PycharmProjects/HotelManger/controllers/hotel_info_controller.py
+# /home/soutonnoma/PycharmProjects/HotelManager/controllers/hotel_info_controller.py
 
 from models.hotel_info_model import HotelInfoModel
 

@@ -1,4 +1,4 @@
-# /home/soutonnoma/PycharmProjects/HotelManger/ui/home.py
+# /home/soutonnoma/PycharmProjects/HotelManager/ui/home.py
 
 from datetime import datetime
 
@@ -9,6 +9,7 @@ from PySide6.QtWidgets import (
     QPushButton, QStackedWidget, QMessageBox, QApplication
 )
 
+from controllers.reservation_controller import ReservationController
 # Import des contrôleurs et services
 from controllers.user_controller import UserController
 from services.sync_service import SyncService
@@ -50,6 +51,8 @@ class HomeWindow(QMainWindow):
         super().__init__()
         self.username = username
         self.role = role
+        self.reservation_controller = ReservationController()
+
         self.user_id = UserController.get_user_by_username(username).get("data", {}).get("id")
 
         # Dictionnaire pour stocker les pages déjà créées (Lazy Loading)
@@ -136,7 +139,7 @@ class HomeWindow(QMainWindow):
             "reception": [
                 ("Tableau de bord", lambda: DashboardPage(self.username, self.role), "dashboard.png"),
                 ("Réservations", lambda: ReservationsPage(self.user_id), "reservations.png"),
-                ("Arrivées", lambda: ArrivalsPage(), "arrivals.png"),
+                ("Arrivées", lambda: ArrivalsPage(self.reservation_controller), "arrivals.png"),
                 ("Départs", lambda: DeparturesPage(self.user_id), "departures.png"),
                 ("Clients", lambda: ClientsPage(), "clients.png"),
                 ("Services", lambda: ServicesPage(self.role), "services.png"),

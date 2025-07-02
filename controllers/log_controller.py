@@ -1,4 +1,4 @@
-# /home/soutonnoma/PycharmProjects/HotelManger/controllers/log_controller.py
+# /home/soutonnoma/PycharmProjects/HotelManager/controllers/log_controller.py
 from models.log_model import LogModel
 
 class LogController:

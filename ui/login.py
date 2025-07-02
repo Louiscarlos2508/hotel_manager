@@ -1,4 +1,4 @@
-# /home/soutonnoma/PycharmProjects/HotelManger/ui/login.py
+# /home/soutonnoma/PycharmProjects/HotelManager/ui/login.py
 
 from PySide6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QLabel, QLineEdit,

@@ -1,4 +1,4 @@
-# /home/soutonnoma/PycharmProjects/HotelManger/ui/pages/paiement_page.py
+# /home/soutonnoma/PycharmProjects/HotelManager/ui/pages/paiement_page.py
 
 from datetime import datetime
 from PySide6.QtWidgets import (

@@ -1,4 +1,4 @@
-# /home/soutonnoma/PycharmProjects/HotelManger/main.py
+# /home/soutonnoma/PycharmProjects/HotelManager/main.py
 
 import sys
 from PySide6.QtWidgets import QApplication

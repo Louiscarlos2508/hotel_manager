@@ -1,4 +1,4 @@
-# /home/soutonnoma/PycharmProjects/HotelManger/controllers/reservation_controller.py
+# /home/soutonnoma/PycharmProjects/HotelManager/controllers/reservation_controller.py
 
 from datetime import datetime, date
 from models.reservation_model import ReservationModel

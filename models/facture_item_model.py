@@ -1,4 +1,4 @@
-# /home/soutonnoma/PycharmProjects/HotelManger/models/facture_item_model.py
+# /home/soutonnoma/PycharmProjects/HotelManager/models/facture_item_model.py
 from datetime import datetime, timezone
 from typing import List, Dict, Any, Optional
 

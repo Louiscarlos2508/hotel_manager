@@ -1,4 +1,4 @@
-# /home/soutonnoma/PycharmProjects/HotelManger/models/probleme_model.py
+# /home/soutonnoma/PycharmProjects/HotelManager/models/probleme_model.py
 from models.base_model import BaseModel
 import sqlite3
 from datetime import datetime, timezone

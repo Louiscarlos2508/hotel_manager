@@ -1,4 +1,4 @@
-# /home/soutonnoma/PycharmProjects/HotelManger/database/db.py
+# /home/soutonnoma/PycharmProjects/HotelManager/database/db.py
 import sqlite3
 import os
 from werkzeug.security import generate_password_hash

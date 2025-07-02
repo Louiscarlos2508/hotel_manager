@@ -1,4 +1,4 @@
-# /home/soutonnoma/PycharmProjects/HotelManger/controllers/facture_controller.py
+# /home/soutonnoma/PycharmProjects/HotelManager/controllers/facture_controller.py
 
 from datetime import date, datetime
 from models.facture_item_model import FactureItemModel

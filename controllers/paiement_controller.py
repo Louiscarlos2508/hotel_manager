@@ -1,4 +1,4 @@
-# /home/soutonnoma/PycharmProjects/HotelManger/controllers/paiement_controller.py
+# /home/soutonnoma/PycharmProjects/HotelManager/controllers/paiement_controller.py
 from models.paiement_model import PaiementModel
 from models.facture_model import FactureModel
 

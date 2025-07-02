@@ -1,4 +1,4 @@
-# /home/soutonnoma/PycharmProjects/HotelManger/models/commande_item_model.py
+# /home/soutonnoma/PycharmProjects/HotelManager/models/commande_item_model.py
 from datetime import datetime, timezone
 from typing import List, Dict, Any
 import sqlite3

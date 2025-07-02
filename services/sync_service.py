@@ -1,4 +1,4 @@
-# /home/soutonnoma/PycharmProjects/HotelManger/services/sync_service.py
+# /home/soutonnoma/PycharmProjects/HotelManager/services/sync_service.py
 
 import os
 import sqlite3

@@ -1,4 +1,4 @@
-# /home/soutonnoma/PycharmProjects/HotelManger/models/paiement_model.py
+# /home/soutonnoma/PycharmProjects/HotelManager/models/paiement_model.py
 from models.base_model import BaseModel
 from datetime import datetime, timezone
 import sqlite3

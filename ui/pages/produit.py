@@ -1,4 +1,4 @@
-# /home/soutonnoma/PycharmProjects/HotelManger/ui/pages/produit.py
+# /home/soutonnoma/PycharmProjects/HotelManager/ui/pages/produit.py
 
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QLabel, QPushButton, QTableWidget,
